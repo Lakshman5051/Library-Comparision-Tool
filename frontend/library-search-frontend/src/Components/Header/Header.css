@@ -8,7 +8,10 @@
 .header-content {
   max-width: 1200px;
   margin: 0 auto;
-  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
 }
 
 .header-title {
@@ -25,6 +28,16 @@
   font-weight: 300;
 }
 
+.header-left {
+  text-align: left;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
   .header-title {
@@ -33,5 +46,15 @@
   
   .header-subtitle {
     font-size: 1rem;
+  }
+
+  .header-content {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+
+  .header-left {
+    text-align: center;
   }
 }
