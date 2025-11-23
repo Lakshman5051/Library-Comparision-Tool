@@ -1,8 +1,10 @@
 package com.project.library_comparison_tool.Controller;
 
+import com.project.library_comparison_tool.dto.AdvancedSearchDTO;
 import com.project.library_comparison_tool.entity.Library;
 import com.project.library_comparison_tool.service.LibraryService;
 import com.project.library_comparison_tool.dto.LibraryDTO;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -62,5 +64,19 @@ public class LibraryController {
     public ResponseEntity<List<LibraryDTO>> getMostPopular() {
         List<Library> libraries = libraryService.getMostPopular();
         return ResponseEntity.ok(LibraryDTO.fromEntities(libraries));
+    }
+
+    //AdvancedSearch
+    @PostMapping("/advanced-search")
+    public ResponseEntity<List<LibraryDTO>> advancedSearch(
+            @RequestBody AdvancedSearchDTO criteria) {
+
+        try {
+            List<LibraryDTO> results = libraryService.advancedSearch(criteria);
+            return ResponseEntity.ok(results);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(null);
+        }
     }
 }

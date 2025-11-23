@@ -23,7 +23,7 @@ public class LibrariesIoDataLoader {
     }
 
     /**
-     * Load libraries for a specific query and platform
+     * Load libraries for a specific query and platform (WITH DETAILED INFO)
      * @param query Search term (like - "json", "logging")
      * @param platform Platform (like - "Maven", "NPM")
      * @param maxPages How many pages to fetch (each page = ~30 results)
@@ -40,7 +40,7 @@ public class LibrariesIoDataLoader {
         for (int page = 1; page <= maxPages; page++) {
             System.out.println("\nFetching page " + page + "...");
 
-            // Fetch from API
+            // STEP 1: Fetch search results
             List<JsonNode> apiResults = apiService.searchLibraries(query, platform, page);
 
             if (apiResults.isEmpty()) {
@@ -48,16 +48,40 @@ public class LibrariesIoDataLoader {
                 break;
             }
 
-            // Convert and save each library
+            // STEP 2: Process each library
             for (JsonNode apiResult : apiResults) {
                 try {
+                    // Map basic info from search result
                     Library library = mapper.mapToLibrary(apiResult, query);
 
                     if (library != null && library.getName() != null) {
-                        // Use addOrUpdateLibrary to avoid duplicates
+                        String libraryPlatform = library.getPackageManager();
+                        String libraryName = library.getName();
+
+                        System.out.println("  Processing: " + libraryName);
+
+                        // STEP 3: Fetch detailed information (has dependent_repos_count!)
+                        try {
+                            JsonNode detailedInfo = apiService.getLibraryDetails(libraryPlatform, libraryName);
+
+                            if (detailedInfo != null) {
+                                // Enrich with detailed data
+                                library = mapper.enrichWithDetailedInfo(library, detailedInfo);
+                                System.out.println("  ✓ Loaded with details: " + libraryName);
+                            } else {
+                                System.out.println("  ⚠ Loaded without details: " + libraryName);
+                            }
+
+                            // Small delay to respect rate limits (100ms = 600 requests/minute, well under 60/min limit)
+                            Thread.sleep(100);
+
+                        } catch (Exception detailError) {
+                            System.err.println("  ⚠ Error fetching details (continuing anyway): " + detailError.getMessage());
+                        }
+
+                        // STEP 4: Save to database
                         libraryService.addOrUpdateLibrary(library);
                         totalLoaded++;
-                        System.out.println("  ✓ Loaded: " + library.getName());
                     }
 
                 } catch (Exception e) {
@@ -65,7 +89,7 @@ public class LibrariesIoDataLoader {
                 }
             }
 
-            // Rate limiting - wait 1 second between pages
+            // Rate limiting between pages - wait 1 second
             try {
                 Thread.sleep(1000);
             } catch (InterruptedException e) {
@@ -74,12 +98,13 @@ public class LibrariesIoDataLoader {
             }
         }
 
+        System.out.println("\n═══════════════════════════════════");
         System.out.println("Loading complete!");
         System.out.println("Total libraries loaded: " + totalLoaded);
+        System.out.println("═══════════════════════════════════\n");
 
         return totalLoaded;
     }
-
     // Load popular libraries across multiple categories
     public int loadPopularLibraries() {
         int total = 0;

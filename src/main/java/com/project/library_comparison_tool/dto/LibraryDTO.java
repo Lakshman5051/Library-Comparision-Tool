@@ -18,6 +18,8 @@ public class LibraryDTO {
     private String category;
     private String description;
 
+    private String categories;
+
     private String framework;
     private String runtimeEnvironment;
     private String language;
@@ -93,6 +95,7 @@ public class LibraryDTO {
                 .id(library.getId())
                 .name(library.getName())
                 .category(library.getCategory())
+                .categories(library.getCategories())
                 .description(library.getDescription())
 
 

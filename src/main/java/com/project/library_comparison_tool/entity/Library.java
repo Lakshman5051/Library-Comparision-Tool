@@ -31,6 +31,9 @@ public class Library {
 
     private String category;
 
+    @Column(length = 500)
+    private String categories;
+
     @Column(length = 1000)
     private String description;
 

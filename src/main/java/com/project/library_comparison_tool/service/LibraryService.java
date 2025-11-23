@@ -1,8 +1,14 @@
 package com.project.library_comparison_tool.service;
 
+import com.project.library_comparison_tool.dto.LibraryDTO;
 import com.project.library_comparison_tool.entity.Library;
 import com.project.library_comparison_tool.repository.LibraryRepository;
 import org.springframework.stereotype.Service;
+import com.project.library_comparison_tool.dto.AdvancedSearchDTO;
+import com.project.library_comparison_tool.repository.LibrarySpecification;
+import org.springframework.data.jpa.domain.Specification;
+import java.util.Comparator;
+import java.util.stream.Collectors;
 
 import java.util.List;
 import java.util.Optional;
@@ -76,5 +82,44 @@ public class LibraryService {
     //most popular libraries
     public List<Library> getMostPopular() {
         return libraryRepository.findAllByOrderByGithubStarsDesc();
+    }
+
+    public List<LibraryDTO> advancedSearch(AdvancedSearchDTO criteria) {
+        // Build dynamic query specification
+        Specification<Library> spec = LibrarySpecification.withAdvancedSearch(criteria);
+
+        // Execute query
+        List<Library> libraries = libraryRepository.findAll(spec);
+
+        // Filter by quality grades (done in-memory since it's a calculated field)
+        if (criteria.getIncludeGrades() != null && !criteria.getIncludeGrades().isEmpty()) {
+            libraries = libraries.stream()
+                    .filter(lib -> criteria.getIncludeGrades().contains(lib.getQualityGrade()))
+                    .collect(Collectors.toList());
+        }
+
+        // Apply sorting
+        if (criteria.getSortBy() != null) {
+            switch (criteria.getSortBy()) {
+                case "stars":
+                    libraries.sort(Comparator.comparing(Library::getGithubStars,
+                            Comparator.nullsLast(Comparator.reverseOrder())));
+                    break;
+                case "dependents":
+                    libraries.sort(Comparator.comparing(Library::getDependentProjectsCount,
+                            Comparator.nullsLast(Comparator.reverseOrder())));
+                    break;
+                case "name":
+                    libraries.sort(Comparator.comparing(Library::getName));
+                    break;
+                case "updated":
+                    libraries.sort(Comparator.comparing(Library::getLastCommitDate,
+                            Comparator.nullsLast(Comparator.reverseOrder())));
+                    break;
+            }
+        }
+
+        // Convert to DTOs
+        return LibraryDTO.fromEntities(libraries);
     }
 }
