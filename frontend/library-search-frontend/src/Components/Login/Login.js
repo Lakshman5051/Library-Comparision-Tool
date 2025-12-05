@@ -1,60 +1,55 @@
 import React, { useState } from 'react';
 import './Login.css';
 import GoogleLoginButton from '../GoogleLoginButton/GoogleLoginButton';
-import { loginWithGoogle } from '../../Services/authService';
+import { loginWithGoogle, login } from '../../Services/authService';
 
 function Login({ onLogin, onSignup }) {
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState('user');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  // Predefined credentials for demo
-  const validCredentials = {
-    admin: {
-      password: 'admin123',
-      role: 'admin'
-    },
-    Lakshman: {
-      password: 'Lakshman123',
-      role: 'user'
-    }
-  };
-
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
 
     // Validation
-    if (!username.trim()) {
-      setError('Please enter a username');
+    if (!email.trim()) {
+      setError('Please enter your email');
       return;
     }
 
     if (!password.trim()) {
-      setError('Please enter a password');
+      setError('Please enter your password');
       return;
     }
 
-    // Check credentials
-    const userCreds = validCredentials[username];
-    
-    if (!userCreds) {
-      setError('Invalid username or password');
-      return;
-    }
+    setIsLoading(true);
 
-    if (userCreds.password !== password) {
-      setError('Invalid username or password');
-      return;
-    }
+    try {
+      const loginData = { email, password };
+      const response = await login(loginData);
 
-    // Successful login - use the role from credentials
-    onLogin({
-      username,
-      role: userCreds.role
-    });
+      if (response.success) {
+        // Pass user data to parent component
+        onLogin({
+          userId: response.userId,
+          username: response.username,
+          email: response.email,
+          firstName: response.firstName,
+          lastName: response.lastName,
+          profilePictureUrl: response.profilePictureUrl,
+          role: response.role,
+          authProvider: response.authProvider
+        });
+      } else {
+        setError(response.message || 'Login failed');
+      }
+    } catch (err) {
+      setError(err.message || 'Login failed. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // Handle Google Login Success
@@ -116,23 +111,24 @@ function Login({ onLogin, onSignup }) {
           )}
 
           <div className="form-group">
-            <label htmlFor="username">Username</label>
+            <label htmlFor="email">Email <span className="required">*</span></label>
             <input
-              id="username"
-              type="text"
+              id="email"
+              type="email"
               className="login-input"
-              placeholder="Enter your username"
-              value={username}
+              placeholder="Enter your email"
+              value={email}
               onChange={(e) => {
-                setUsername(e.target.value);
+                setEmail(e.target.value);
                 setError('');
               }}
               autoFocus
+              required
             />
           </div>
 
           <div className="form-group">
-            <label htmlFor="password">Password</label>
+            <label htmlFor="password">Password <span className="required">*</span></label>
             <input
               id="password"
               type="password"
@@ -143,6 +139,7 @@ function Login({ onLogin, onSignup }) {
                 setPassword(e.target.value);
                 setError('');
               }}
+              required
             />
           </div>
 

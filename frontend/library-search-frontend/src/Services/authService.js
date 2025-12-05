@@ -78,3 +78,61 @@ export const checkAuthentication = async () => {
     return false;
   }
 };
+
+/**
+ * Login with email and password
+ * @param {object} loginData - { email, password }
+ * @returns {Promise} - User data if login successful
+ */
+export const login = async (loginData) => {
+  try {
+    const response = await fetch(`${API_URL}/api/auth/login`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include', // Include cookies for session
+      body: JSON.stringify(loginData),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.message || 'Login failed');
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Login error:', error);
+    throw error;
+  }
+};
+
+/**
+ * Signup new user with email and password
+ * @param {object} signupData - { firstName, lastName, email, password }
+ * @returns {Promise} - User data if signup successful
+ */
+export const signup = async (signupData) => {
+  try {
+    const response = await fetch(`${API_URL}/api/auth/signup`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include', // Include cookies for auto-login after signup
+      body: JSON.stringify(signupData),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.message || 'Signup failed');
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Signup error:', error);
+    throw error;
+  }
+};

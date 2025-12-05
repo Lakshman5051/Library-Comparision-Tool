@@ -78,6 +78,12 @@
   font-size: 0.9rem;
 }
 
+.required {
+  color: #dc2626;
+  font-weight: 700;
+  margin-left: 2px;
+}
+
 .login-input,
 .role-select {
   width: 100%;

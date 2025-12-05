@@ -2,10 +2,13 @@ package com.project.library_comparison_tool.service;
 
 import com.project.library_comparison_tool.dto.AuthResponse;
 import com.project.library_comparison_tool.dto.GoogleUserInfo;
+import com.project.library_comparison_tool.dto.LoginRequest;
+import com.project.library_comparison_tool.dto.SignupRequest;
 import com.project.library_comparison_tool.entity.Role;
 import com.project.library_comparison_tool.entity.User;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,6 +24,9 @@ public class AuthService {
 
     @Autowired
     private UserService userService;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
 
     /**
      * Authenticate user with Google OAuth.
@@ -144,5 +150,90 @@ public class AuthService {
                 .isNewUser(isNewUser)
                 .message(message)
                 .build();
+    }
+
+    /**
+     * Authenticate user with email and password (traditional login)
+     *
+     * @param loginRequest Login request with email and password
+     * @param session HTTP session
+     * @return AuthResponse containing user information
+     */
+    @Transactional
+    public AuthResponse login(LoginRequest loginRequest, HttpSession session) {
+        // Find user by email
+        User user = userService.findByEmail(loginRequest.getEmail()).orElse(null);
+
+        if (user == null) {
+            return AuthResponse.builder()
+                    .success(false)
+                    .message("Invalid email or password")
+                    .build();
+        }
+
+        // Check if user is a local user (not OAuth)
+        if (!user.isLocalUser()) {
+            return AuthResponse.builder()
+                    .success(false)
+                    .message("Please login using " + user.getAuthProvider().toString())
+                    .build();
+        }
+
+        // Verify password
+        if (!passwordEncoder.matches(loginRequest.getPassword(), user.getPasswordHash())) {
+            return AuthResponse.builder()
+                    .success(false)
+                    .message("Invalid email or password")
+                    .build();
+        }
+
+        // Check if account is active
+        if (!user.getIsActive()) {
+            return AuthResponse.builder()
+                    .success(false)
+                    .message("Account is disabled. Please contact support.")
+                    .build();
+        }
+
+        // Update last login timestamp
+        user.updateLastLogin();
+        userService.saveUser(user);
+
+        // Create session
+        session.setAttribute("userId", user.getId());
+        session.setAttribute("userEmail", user.getEmail());
+        session.setAttribute("authProvider", user.getAuthProvider().toString());
+
+        // Return response
+        return buildAuthResponse(user, false, "Login successful");
+    }
+
+    /**
+     * Register a new user with traditional signup (email/password)
+     *
+     * @param signupRequest Signup request with user details
+     * @param session HTTP session
+     * @return AuthResponse containing user information
+     */
+    @Transactional
+    public AuthResponse signup(SignupRequest signupRequest, HttpSession session) {
+        // Check if email already exists
+        if (userService.existsByEmail(signupRequest.getEmail())) {
+            return AuthResponse.builder()
+                    .success(false)
+                    .message("Email already registered")
+                    .build();
+        }
+
+        // Create new user
+        User user = userService.createUserFromSignup(signupRequest);
+
+        // Create session for auto-login after signup
+        session.setAttribute("userId", user.getId());
+        session.setAttribute("userEmail", user.getEmail());
+        session.setAttribute("authProvider", user.getAuthProvider().toString());
+
+        // Return response
+        return buildAuthResponse(user, true, "Account created successfully");
     }
 }

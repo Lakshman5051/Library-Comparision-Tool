@@ -1,11 +1,13 @@
 package com.project.library_comparison_tool.service;
 
 import com.project.library_comparison_tool.dto.GoogleUserInfo;
+import com.project.library_comparison_tool.dto.SignupRequest;
 import com.project.library_comparison_tool.entity.AuthProvider;
 import com.project.library_comparison_tool.entity.Role;
 import com.project.library_comparison_tool.entity.User;
 import com.project.library_comparison_tool.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,6 +19,9 @@ public class UserService {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
 
     /**
      * Find user by email address
@@ -211,5 +216,49 @@ public class UserService {
      */
     public boolean isAdmin(User user) {
         return user.hasRole(Role.ADMIN);
+    }
+
+    /**
+     * Create a new user from signup request (traditional registration)
+     *
+     * @param signupRequest Signup request with user details
+     * @return Created user entity
+     */
+    @Transactional
+    public User createUserFromSignup(SignupRequest signupRequest) {
+        // Generate username from first and last name
+        String generatedUsername = signupRequest.getFirstName() + " " + signupRequest.getLastName();
+
+        // Ensure username is unique
+        String finalUsername = generatedUsername;
+        int counter = 1;
+        while (userRepository.existsByUsername(finalUsername)) {
+            finalUsername = generatedUsername + " " + counter;
+            counter++;
+        }
+
+        // Hash the password
+        String hashedPassword = passwordEncoder.encode(signupRequest.getPassword());
+
+        // Build new user
+        User user = User.builder()
+                .username(finalUsername)
+                .email(signupRequest.getEmail())
+                .passwordHash(hashedPassword)
+                .authProvider(AuthProvider.LOCAL)
+                .firstName(signupRequest.getFirstName())
+                .lastName(signupRequest.getLastName())
+                .emailVerified(false)  // Email not verified yet
+                .isActive(true)
+                .build();
+
+        // Assign default USER role
+        user.addRole(Role.USER);
+
+        // Update login timestamp
+        user.updateLastLogin();
+
+        // Save to database
+        return userRepository.save(user);
     }
 }

@@ -89,12 +89,6 @@ const [excludeUnmaintained, setExcludeUnmaintained] = useState(false);
   const handleOpenSignup = () => setShowSignup(true);
   const handleCloseSignup = () => setShowSignup(false);
 
-  const handleSignupSubmit = (payload) => {
-    // Demo behavior: log payload and show a small alert
-    console.log('Signup payload (demo):', payload);
-    alert('Account created (demo). You can now log in.');
-  };
-
   // Fetching Layer
   
   const fetchAllLibraries = async () => {
@@ -325,8 +319,8 @@ const handleResetAdvancedFilters = () => {
       <Login onLogin={handleLogin} onSignup={handleOpenSignup} />
       {showSignup && (
         <React.Suspense fallback={null}>
-          {/* Lazy simple signup modal */}
-          <Signup onClose={handleCloseSignup} onSubmit={handleSignupSubmit} />
+          {/* Signup modal with real backend integration */}
+          <Signup onClose={handleCloseSignup} onLogin={handleLogin} />
         </React.Suspense>
       )}
     </>;

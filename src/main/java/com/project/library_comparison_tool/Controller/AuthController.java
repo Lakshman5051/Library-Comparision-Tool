@@ -1,6 +1,8 @@
 package com.project.library_comparison_tool.Controller;
 
 import com.project.library_comparison_tool.dto.AuthResponse;
+import com.project.library_comparison_tool.dto.LoginRequest;
+import com.project.library_comparison_tool.dto.SignupRequest;
 import com.project.library_comparison_tool.service.AuthService;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -81,6 +83,63 @@ public class AuthController {
     }
 
     /**
+     * Login with email and password (traditional login).
+     *
+     * Endpoint: POST /api/auth/login
+     * Request Body: { "email": "...", "password": "..." }
+     * Response: AuthResponse with user information
+     *
+     * @param loginRequest Login request with email and password
+     * @param session HTTP session
+     * @return ResponseEntity with AuthResponse
+     */
+    @PostMapping("/login")
+    public ResponseEntity<AuthResponse> login(
+            @RequestBody LoginRequest loginRequest,
+            HttpSession session) {
+
+        try {
+            // Validate required fields
+            if (loginRequest.getEmail() == null || loginRequest.getEmail().trim().isEmpty()) {
+                return ResponseEntity
+                        .badRequest()
+                        .body(AuthResponse.builder()
+                                .success(false)
+                                .message("Email is required")
+                                .build());
+            }
+
+            if (loginRequest.getPassword() == null || loginRequest.getPassword().trim().isEmpty()) {
+                return ResponseEntity
+                        .badRequest()
+                        .body(AuthResponse.builder()
+                                .success(false)
+                                .message("Password is required")
+                                .build());
+            }
+
+            // Authenticate user
+            AuthResponse response = authService.login(loginRequest, session);
+
+            if (response.getSuccess()) {
+                return ResponseEntity.ok(response);
+            } else {
+                return ResponseEntity
+                        .status(HttpStatus.UNAUTHORIZED)
+                        .body(response);
+            }
+
+        } catch (Exception e) {
+            return ResponseEntity
+                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(AuthResponse.builder()
+                            .success(false)
+                            .message("Login failed: " + e.getMessage())
+                            .build());
+        }
+    }
+
+    /**
      * Get current authenticated user information.
      *
      * Endpoint: GET /api/auth/me
@@ -139,5 +198,118 @@ public class AuthController {
         return ResponseEntity.ok(
                 Map.of("authenticated", isAuthenticated)
         );
+    }
+
+    /**
+     * Signup new user with email and password.
+     *
+     * Endpoint: POST /api/auth/signup
+     * Request Body: { "firstName": "...", "lastName": "...", "email": "...", "password": "..." }
+     * Response: AuthResponse with user information
+     *
+     * @param signupRequest Signup request with user details
+     * @param session HTTP session
+     * @return ResponseEntity with AuthResponse
+     */
+    @PostMapping("/signup")
+    public ResponseEntity<AuthResponse> signup(
+            @RequestBody SignupRequest signupRequest,
+            HttpSession session) {
+
+        try {
+            // Validate required fields
+            if (signupRequest.getEmail() == null || signupRequest.getEmail().trim().isEmpty()) {
+                return ResponseEntity
+                        .badRequest()
+                        .body(AuthResponse.builder()
+                                .success(false)
+                                .message("Email is required")
+                                .build());
+            }
+
+            // Email format validation
+            String emailRegex = "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$";
+            if (!signupRequest.getEmail().matches(emailRegex)) {
+                return ResponseEntity
+                        .badRequest()
+                        .body(AuthResponse.builder()
+                                .success(false)
+                                .message("Invalid email format")
+                                .build());
+            }
+
+            if (signupRequest.getPassword() == null || signupRequest.getPassword().trim().isEmpty()) {
+                return ResponseEntity
+                        .badRequest()
+                        .body(AuthResponse.builder()
+                                .success(false)
+                                .message("Password is required")
+                                .build());
+            }
+
+            // Password strength validation
+            if (signupRequest.getPassword().length() < 8) {
+                return ResponseEntity
+                        .badRequest()
+                        .body(AuthResponse.builder()
+                                .success(false)
+                                .message("Password must be at least 8 characters long")
+                                .build());
+            }
+
+            String password = signupRequest.getPassword();
+            boolean hasUpperCase = password.chars().anyMatch(Character::isUpperCase);
+            boolean hasLowerCase = password.chars().anyMatch(Character::isLowerCase);
+            boolean hasDigit = password.chars().anyMatch(Character::isDigit);
+            boolean hasSpecialChar = password.matches(".*[!@#$%^&*(),.?\":{}|<>].*");
+
+            if (!hasUpperCase || !hasLowerCase || !hasDigit || !hasSpecialChar) {
+                return ResponseEntity
+                        .badRequest()
+                        .body(AuthResponse.builder()
+                                .success(false)
+                                .message("Password must contain uppercase, lowercase, number, and special character")
+                                .build());
+            }
+
+            if (signupRequest.getFirstName() == null || signupRequest.getFirstName().trim().isEmpty()) {
+                return ResponseEntity
+                        .badRequest()
+                        .body(AuthResponse.builder()
+                                .success(false)
+                                .message("First name is required")
+                                .build());
+            }
+
+            if (signupRequest.getLastName() == null || signupRequest.getLastName().trim().isEmpty()) {
+                return ResponseEntity
+                        .badRequest()
+                        .body(AuthResponse.builder()
+                                .success(false)
+                                .message("Last name is required")
+                                .build());
+            }
+
+            // Create new user
+            AuthResponse response = authService.signup(signupRequest, session);
+
+            if (response.getSuccess()) {
+                return ResponseEntity
+                        .status(HttpStatus.CREATED)
+                        .body(response);
+            } else {
+                return ResponseEntity
+                        .badRequest()
+                        .body(response);
+            }
+
+        } catch (Exception e) {
+            return ResponseEntity
+                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(AuthResponse.builder()
+                            .success(false)
+                            .message("Signup failed: " + e.getMessage())
+                            .build());
+        }
     }
 }
