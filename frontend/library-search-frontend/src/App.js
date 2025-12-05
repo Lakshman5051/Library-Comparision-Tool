@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import './App.css';
+import { GoogleOAuthProvider } from '@react-oauth/google';
 
 // Components
 import Header from './Components/Header/Header';
@@ -8,13 +9,14 @@ import UserBadge from './Components/UserBadge/UserBadge';
 import LibraryDetails from './Components/LibraryDetails/LibraryDetails';
 import Signup from './Components/Signup/Signup';
 
+// Services
+import { logout, getCurrentUser } from './Services/authService';
+
 function App() {
 
   const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080';
 
-  // ============================================
-  // STATE MANAGEMENT
-  // ============================================
+  // state management
   
   // Authentication State
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -52,30 +54,36 @@ const [excludeDeprecated, setExcludeDeprecated] = useState(false);
 const [excludeSecurityIssues, setExcludeSecurityIssues] = useState(false);
 const [excludeUnmaintained, setExcludeUnmaintained] = useState(false);
 
-  // ============================================
-  // AUTHENTICATION HANDLERS
-  // ============================================
+  // Auth Handlers
   
   const handleLogin = (userData) => {
     setCurrentUser(userData);
     setIsLoggedIn(true);
     setShowWelcome(true);
-    
+
     // Hide welcome message after 3 seconds
     setTimeout(() => {
       setShowWelcome(false);
     }, 3000);
-    
+
     // Fetch real data from backend after login
     fetchAllLibraries();
   };
 
-  const handleLogout = () => {
-    setIsLoggedIn(false);
-    setCurrentUser(null);
-    setLibraries([]);
-    setSelectedLibraries([]);
-    handleResetFilters();
+  const handleLogout = async () => {
+    try {
+      // Call backend logout API
+      await logout();
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      // Clear frontend state
+      setIsLoggedIn(false);
+      setCurrentUser(null);
+      setLibraries([]);
+      setSelectedLibraries([]);
+      handleResetFilters();
+    }
   };
 
   const handleOpenSignup = () => setShowSignup(true);
@@ -87,9 +95,7 @@ const [excludeUnmaintained, setExcludeUnmaintained] = useState(false);
     alert('Account created (demo). You can now log in.');
   };
 
-  // ============================================
-  // DATA FETCHING (FROM BACKEND API)
-  // ============================================
+  // Fetching Layer
   
   const fetchAllLibraries = async () => {
     setIsLoading(true);
@@ -112,9 +118,6 @@ const [excludeUnmaintained, setExcludeUnmaintained] = useState(false);
     }
   };
 
-  // ============================================
-  // HELPER FUNCTIONS FOR DISPLAY
-  // ============================================
   
   const formatDependents = (count) => {
     if (!count || count === 0) return '0';
@@ -123,9 +126,7 @@ const [excludeUnmaintained, setExcludeUnmaintained] = useState(false);
     return count.toLocaleString();
   };
 
-  // ============================================
-  // FILTERING & SORTING LOGIC
-  // ============================================
+  // sorting logic
   
  const filteredLibraries = useMemo(() => {
   let result = [...libraries];
@@ -168,11 +169,8 @@ const [excludeUnmaintained, setExcludeUnmaintained] = useState(false);
   return result;
 }, [libraries, searchQuery, categoryFilter, platformFilter, sortBy]);
 
-  // ============================================
-  // HELPER FUNCTIONS
-  // ============================================
-  
- // UPDATED: Get all unique categories (including from multi-category libraries)
+    
+ // Get all unique categories (including from multi-category libraries)
 const uniqueCategories = useMemo(() => {
   const categorySet = new Set();
   
@@ -320,9 +318,7 @@ const handleResetAdvancedFilters = () => {
   fetchAllLibraries(); // Back to showing all
 };
 
-  // ============================================
-  // RENDER - LOGIN SCREEN
-  // ============================================
+  // login screen
   
   if (!isLoggedIn) {
     return <>
@@ -336,9 +332,7 @@ const handleResetAdvancedFilters = () => {
     </>;
   }
 
-  // ============================================
-  // RENDER - MAIN APPLICATION
-  // ============================================
+  // welcome notification
   
   return (
     <div className="app">
@@ -729,4 +723,23 @@ const handleResetAdvancedFilters = () => {
   );
 }
 
-export default App;
+// Wrap App with GoogleOAuthProvider
+function AppWithGoogleOAuth() {
+  const GOOGLE_CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID;
+
+  if (!GOOGLE_CLIENT_ID) {
+    console.error('REACT_APP_GOOGLE_CLIENT_ID is not set in environment variables');
+    return <div style={{ padding: '2rem', textAlign: 'center' }}>
+      <h2>Configuration Error</h2>
+      <p>Google Client ID is not configured. Please check your .env file.</p>
+    </div>;
+  }
+
+  return (
+    <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
+      <App />
+    </GoogleOAuthProvider>
+  );
+}
+
+export default AppWithGoogleOAuth;

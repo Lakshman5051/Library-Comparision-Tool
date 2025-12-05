@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
 import './Login.css';
+import GoogleLoginButton from '../GoogleLoginButton/GoogleLoginButton';
+import { loginWithGoogle } from '../../Services/authService';
 
 function Login({ onLogin, onSignup }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState('user');
   const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
   // Predefined credentials for demo
   const validCredentials = {
@@ -48,10 +51,46 @@ function Login({ onLogin, onSignup }) {
     }
 
     // Successful login - use the role from credentials
-    onLogin({ 
-      username, 
-      role: userCreds.role 
+    onLogin({
+      username,
+      role: userCreds.role
     });
+  };
+
+  // Handle Google Login Success
+  const handleGoogleSuccess = async (idToken) => {
+    setIsLoading(true);
+    setError('');
+
+    try {
+      const response = await loginWithGoogle(idToken);
+
+      if (response.success) {
+        // Pass user data to parent component
+        onLogin({
+          userId: response.userId,
+          username: response.username || response.email,
+          email: response.email,
+          firstName: response.firstName,
+          lastName: response.lastName,
+          profilePictureUrl: response.profilePictureUrl,
+          role: response.role,
+          authProvider: response.authProvider,
+          isNewUser: response.isNewUser
+        });
+      } else {
+        setError(response.message || 'Google login failed');
+      }
+    } catch (err) {
+      setError(err.message || 'Failed to login with Google');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Handle Google Login Error
+  const handleGoogleError = (errorMessage) => {
+    setError(errorMessage);
   };
 
   return (
@@ -59,7 +98,16 @@ function Login({ onLogin, onSignup }) {
       <div className="login-card">
         <h1>Library Comparator</h1>
         <p className="subtitle">Please login to continue</p>
-        
+
+        <GoogleLoginButton
+          onSuccess={handleGoogleSuccess}
+          onError={handleGoogleError}
+        />
+
+        <div className="divider">
+          <span>OR</span>
+        </div>
+
         <form onSubmit={handleSubmit}>
           {error && (
             <div className="error-message">
@@ -98,8 +146,8 @@ function Login({ onLogin, onSignup }) {
             />
           </div>
 
-          <button type="submit" className="login-btn">
-            Login
+          <button type="submit" className="login-btn" disabled={isLoading}>
+            {isLoading ? 'Logging in...' : 'Login'}
           </button>
         </form>
 
@@ -109,20 +157,6 @@ function Login({ onLogin, onSignup }) {
             Sign Up
           </button>
         </div>
-
-        {/*<div className="demo-credentials">
-          <p className="demo-title">Demo Credentials:</p>
-          <div className="credentials-table">
-            <div className="credential-row">
-              <span className="label">Admin:</span>
-              <span className="value">username: <strong>admin</strong> | password: <strong>admin123</strong></span>
-            </div>
-            <div className="credential-row">
-              <span className="label">User:</span>
-              <span className="value">username: <strong>Lakshman</strong> | password: <strong>Lakshman123</strong></span>
-            </div>
-          </div> 
-        </div>*/}
       </div>
     </div>
   );

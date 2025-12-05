@@ -22,14 +22,32 @@ public class User {
         private Long id;
 
         // Authentication fields
-        @Column(nullable = false, unique = true, length = 50)
+        // MODIFIED: Made nullable to support OAuth users who don't have usernames
+        @Column(unique = true, length = 50)
         private String username;
 
         @Column(nullable = false, unique = true, length = 100)
         private String email;
 
-        @Column(name = "password_hash", nullable = false)
+        // MODIFIED: Made nullable to support OAuth users who don't have passwords
+        @Column(name = "password_hash")
         private String passwordHash;
+
+        // OAuth specific fields
+        @Column(name = "google_id", unique = true)
+        private String googleId;
+
+        @Column(name = "auth_provider", nullable = false)
+        @Enumerated(EnumType.STRING)
+        @Builder.Default
+        private AuthProvider authProvider = AuthProvider.LOCAL;
+
+        @Column(name = "profile_picture_url", length = 500)
+        private String profilePictureUrl;
+
+        @Column(name = "email_verified")
+        @Builder.Default
+        private Boolean emailVerified = false;
 
         // Profile fields
         @Column(name = "first_name", length = 100)
@@ -127,7 +145,21 @@ public class User {
             } else if (lastName != null) {
                 return lastName;
             }
-            return username;
+            return username != null ? username : email;
+        }
+
+        /**
+         * Check if this is a Google OAuth user
+         */
+        public boolean isGoogleUser() {
+            return authProvider == AuthProvider.GOOGLE;
+        }
+
+        /**
+         * Check if this is a local (username/password) user
+         */
+        public boolean isLocalUser() {
+            return authProvider == AuthProvider.LOCAL;
         }
 }
 
