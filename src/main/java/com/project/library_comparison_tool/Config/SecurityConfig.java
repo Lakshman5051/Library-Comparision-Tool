@@ -61,12 +61,11 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        // Allow frontend origins
-        // TODO: Change to specific origin in production (e.g., https://yourdomain.com)
-        configuration.setAllowedOrigins(Arrays.asList(
-                "http://localhost:3000",
-                "http://localhost:3001",
-                "http://localhost:5173"
+        // Allow frontend origins (localhost for development + production URLs)
+        // Using allowedOriginPatterns to support wildcards for Vercel deployments
+        configuration.setAllowedOriginPatterns(Arrays.asList(
+                "http://localhost:*",           // All localhost ports
+                "https://*.vercel.app"          // All Vercel deployments (including preview)
         ));
 
         // Allow common HTTP methods
