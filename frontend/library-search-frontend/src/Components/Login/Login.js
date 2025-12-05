@@ -2,12 +2,19 @@ import React, { useState } from 'react';
 import './Login.css';
 import GoogleLoginButton from '../GoogleLoginButton/GoogleLoginButton';
 import { loginWithGoogle, login } from '../../Services/authService';
+import ForgotPassword from '../ForgotPassword/ForgotPassword';
+import ResetPassword from '../ResetPassword/ResetPassword';
 
 function Login({ onLogin, onSignup }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [showResetPassword, setShowResetPassword] = useState(false);
+  const [resetToken, setResetToken] = useState('');
+  const [resetEmail, setResetEmail] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -88,6 +95,22 @@ function Login({ onLogin, onSignup }) {
     setError(errorMessage);
   };
 
+  // Handle Forgot Password Success
+  const handleForgotPasswordSuccess = (token, emailAddress) => {
+    setResetToken(token);
+    setResetEmail(emailAddress);
+    setShowForgotPassword(false);
+    setShowResetPassword(true);
+  };
+
+  // Handle Reset Password Success
+  const handleResetPasswordSuccess = () => {
+    setShowResetPassword(false);
+    setSuccessMessage('Password reset successful! You can now login with your new password.');
+    setEmail(resetEmail);
+    setTimeout(() => setSuccessMessage(''), 5000); // Clear message after 5 seconds
+  };
+
   return (
     <div className="login-container">
       <div className="login-card">
@@ -104,6 +127,12 @@ function Login({ onLogin, onSignup }) {
         </div>
 
         <form onSubmit={handleSubmit}>
+          {successMessage && (
+            <div className="success-message">
+              <span>✓</span> {successMessage}
+            </div>
+          )}
+
           {error && (
             <div className="error-message">
               <span>⚠️</span> {error}
@@ -143,6 +172,16 @@ function Login({ onLogin, onSignup }) {
             />
           </div>
 
+          <div className="forgot-password-link">
+            <button
+              type="button"
+              className="link-btn"
+              onClick={() => setShowForgotPassword(true)}
+            >
+              Forgot/Reset Password
+            </button>
+          </div>
+
           <button type="submit" className="login-btn" disabled={isLoading}>
             {isLoading ? 'Logging in...' : 'Login'}
           </button>
@@ -155,6 +194,21 @@ function Login({ onLogin, onSignup }) {
           </button>
         </div>
       </div>
+
+      {showForgotPassword && (
+        <ForgotPassword
+          onClose={() => setShowForgotPassword(false)}
+          onSuccess={handleForgotPasswordSuccess}
+        />
+      )}
+
+      {showResetPassword && (
+        <ResetPassword
+          token={resetToken}
+          onClose={() => setShowResetPassword(false)}
+          onSuccess={handleResetPasswordSuccess}
+        />
+      )}
     </div>
   );
 }
