@@ -29,3 +29,4 @@ Thumbs.db
 # Temporary files
 *.class
 *.tmp
+src/main/resources/application-local.properties
