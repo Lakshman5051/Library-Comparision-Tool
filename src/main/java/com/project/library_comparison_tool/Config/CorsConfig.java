@@ -13,9 +13,13 @@ public class CorsConfig {
     @Bean
     public CorsFilter corsFilter() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(Arrays.asList("*")); // Allow all for now, we'll fix this later
-        config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE"));
+        // IMPORTANT: Cannot use "*" when allowCredentials is true
+        // Must specify exact origins for session cookies to work
+        config.setAllowedOriginPatterns(Arrays.asList("*")); // Allows all origins with credentials
+        config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(Arrays.asList("*"));
+        config.setAllowCredentials(true); // CRITICAL: Enable credentials (cookies, sessions)
+        config.setExposedHeaders(Arrays.asList("Set-Cookie")); // Expose session cookies
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);

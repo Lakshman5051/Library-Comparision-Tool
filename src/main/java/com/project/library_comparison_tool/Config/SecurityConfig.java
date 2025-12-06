@@ -7,6 +7,7 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -20,6 +21,9 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
+                // Add custom session authentication filter before Spring Security's authentication filters
+                .addFilterBefore(new SessionAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class)
+                
                 // Configure CORS
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
 
@@ -30,7 +34,23 @@ public class SecurityConfig {
                 // Configure authorization rules
                 .authorizeHttpRequests(auth -> auth
                         // Public endpoints - no authentication required
-                        .requestMatchers("/api/auth/**").permitAll()
+                        .requestMatchers("/api/auth/google").permitAll()
+                        .requestMatchers("/api/auth/login").permitAll()
+                        .requestMatchers("/api/auth/signup").permitAll()
+                        .requestMatchers("/api/auth/forgot-password").permitAll()
+                        .requestMatchers("/api/auth/reset-password").permitAll()
+                        .requestMatchers("/api/auth/validate-reset-token").permitAll()
+                        .requestMatchers("/api/auth/send-verification-otp").permitAll()
+                        .requestMatchers("/api/auth/verify-email").permitAll()
+                        .requestMatchers("/api/auth/resend-verification-otp").permitAll()
+                        .requestMatchers("/api/auth/verify-login-otp").permitAll()
+                        .requestMatchers("/api/auth/resend-login-otp").permitAll()
+                        // Protected endpoints - require authentication
+                        .requestMatchers("/api/auth/change-email").authenticated()
+                        .requestMatchers("/api/auth/change-password").authenticated()
+                        .requestMatchers("/api/auth/me").authenticated()
+                        .requestMatchers("/api/auth/logout").authenticated()
+                        .requestMatchers("/api/auth/check").authenticated()
                         .requestMatchers("/api/libraries/search**").permitAll()
                         .requestMatchers("/api/libraries").permitAll()
                         .requestMatchers("/api/libraries/{id}").permitAll()
@@ -47,6 +67,7 @@ public class SecurityConfig {
 
                 // Configure session management
                 .sessionManagement(session -> session
+                        .sessionCreationPolicy(org.springframework.security.config.http.SessionCreationPolicy.IF_REQUIRED) // Create session when needed
                         .maximumSessions(1) // Only one session per user
                         .maxSessionsPreventsLogin(false) // New login invalidates old session
                 );
@@ -80,11 +101,18 @@ public class SecurityConfig {
                 "Authorization",
                 "Content-Type",
                 "Accept",
-                "X-Requested-With"
+                "X-Requested-With",
+                "Cookie"
         ));
 
-        // Allow credentials (cookies, sessions)
+        // Allow credentials (cookies, sessions) - CRITICAL for session management
         configuration.setAllowCredentials(true);
+
+        // Expose headers that frontend might need
+        configuration.setExposedHeaders(Arrays.asList(
+                "Set-Cookie",
+                "Authorization"
+        ));
 
         // Max age for preflight requests (1 hour)
         configuration.setMaxAge(3600L);
