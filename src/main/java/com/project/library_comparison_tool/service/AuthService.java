@@ -62,6 +62,9 @@ public class AuthService {
         session.setAttribute("userId", user.getId());
         session.setAttribute("userEmail", user.getEmail());
         session.setAttribute("authProvider", user.getAuthProvider().toString());
+        // Store user role for Spring Security
+        String primaryRole = user.hasRole(Role.ADMIN) ? "ADMIN" : "USER";
+        session.setAttribute("userRole", primaryRole);
 
         // Step 5: Build and return response
         return buildAuthResponse(user, isNewUser, "Login successful");
@@ -153,14 +156,14 @@ public class AuthService {
     }
 
     /**
-     * Authenticate user with email and password (traditional login)
+     * Verify password and prepare for 2FA (Step 1 of login)
+     * After password verification, OTP will be sent to user's email
      *
      * @param loginRequest Login request with email and password
-     * @param session HTTP session
-     * @return AuthResponse containing user information
+     * @return AuthResponse indicating password is correct and OTP is required
      */
     @Transactional
-    public AuthResponse login(LoginRequest loginRequest, HttpSession session) {
+    public AuthResponse verifyPassword(LoginRequest loginRequest) {
         // Find user by email
         User user = userService.findByEmail(loginRequest.getEmail()).orElse(null);
 
@@ -195,6 +198,34 @@ public class AuthService {
                     .build();
         }
 
+        // Check if email is verified (for local users)
+        if (user.isLocalUser() && !Boolean.TRUE.equals(user.getEmailVerified())) {
+            return AuthResponse.builder()
+                    .success(false)
+                    .message("Please verify your email before logging in. Check your inbox for the verification code.")
+                    .build();
+        }
+
+        // Password is correct - return success indicating OTP is required
+        return AuthResponse.builder()
+                .success(true)
+                .message("Password verified. Please enter the OTP sent to your email.")
+                .email(user.getEmail())
+                .build();
+    }
+
+    /**
+     * Complete login after OTP verification (Step 2 of login)
+     *
+     * @param email User's email
+     * @param session HTTP session
+     * @return AuthResponse containing user information
+     */
+    @Transactional
+    public AuthResponse completeLogin(String email, HttpSession session) {
+        User user = userService.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
         // Update last login timestamp
         user.updateLastLogin();
         userService.saveUser(user);
@@ -203,6 +234,9 @@ public class AuthService {
         session.setAttribute("userId", user.getId());
         session.setAttribute("userEmail", user.getEmail());
         session.setAttribute("authProvider", user.getAuthProvider().toString());
+        // Store user role for Spring Security
+        String primaryRole = user.hasRole(Role.ADMIN) ? "ADMIN" : "USER";
+        session.setAttribute("userRole", primaryRole);
 
         // Return response
         return buildAuthResponse(user, false, "Login successful");
@@ -225,15 +259,150 @@ public class AuthService {
                     .build();
         }
 
-        // Create new user
+        // Create new user (emailVerified will be false by default)
         User user = userService.createUserFromSignup(signupRequest);
 
-        // Create session for auto-login after signup
-        session.setAttribute("userId", user.getId());
-        session.setAttribute("userEmail", user.getEmail());
-        session.setAttribute("authProvider", user.getAuthProvider().toString());
+        // Don't create session yet - user needs to verify email first
+        // Session will be created after email verification in verifyEmail endpoint
 
-        // Return response
+        // Return response (without session)
         return buildAuthResponse(user, true, "Account created successfully");
+    }
+
+    /**
+     * Change user's email address.
+     * Requires password verification for security.
+     *
+     * @param userId User ID from session
+     * @param newEmail New email address
+     * @param password Current password for verification
+     * @return AuthResponse indicating success or failure
+     */
+    @Transactional
+    public AuthResponse changeEmail(Long userId, String newEmail, String password) {
+        // Find user
+        User user = userService.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        // Check if user is a local user (OAuth users can't change email this way)
+        if (!user.isLocalUser()) {
+            return AuthResponse.builder()
+                    .success(false)
+                    .message("Email change is not available for " + user.getAuthProvider().toString() + " accounts")
+                    .build();
+        }
+
+        // Verify password
+        if (!passwordEncoder.matches(password, user.getPasswordHash())) {
+            return AuthResponse.builder()
+                    .success(false)
+                    .message("Invalid password")
+                    .build();
+        }
+
+        // Check if new email is same as current
+        if (newEmail.equalsIgnoreCase(user.getEmail())) {
+            return AuthResponse.builder()
+                    .success(false)
+                    .message("New email must be different from current email")
+                    .build();
+        }
+
+        // Check if new email is already taken
+        if (userService.existsByEmail(newEmail)) {
+            return AuthResponse.builder()
+                    .success(false)
+                    .message("Email address is already registered")
+                    .build();
+        }
+
+        // Validate email format
+        String emailRegex = "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$";
+        if (!newEmail.matches(emailRegex)) {
+            return AuthResponse.builder()
+                    .success(false)
+                    .message("Invalid email format")
+                    .build();
+        }
+
+        // Update email and mark as unverified (user needs to verify new email)
+        user.setEmail(newEmail);
+        user.setEmailVerified(false);
+        userService.saveUser(user);
+
+        return AuthResponse.builder()
+                .success(true)
+                .message("Email address updated successfully. Please verify your new email address.")
+                .email(newEmail)
+                .build();
+    }
+
+    /**
+     * Change user's password.
+     * Requires current password verification for security.
+     *
+     * @param userId User ID from session
+     * @param currentPassword Current password for verification
+     * @param newPassword New password
+     * @return AuthResponse indicating success or failure
+     */
+    @Transactional
+    public AuthResponse changePassword(Long userId, String currentPassword, String newPassword) {
+        // Find user
+        User user = userService.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        // Check if user is a local user (OAuth users don't have passwords)
+        if (!user.isLocalUser()) {
+            return AuthResponse.builder()
+                    .success(false)
+                    .message("Password change is not available for " + user.getAuthProvider().toString() + " accounts")
+                    .build();
+        }
+
+        // Verify current password
+        if (!passwordEncoder.matches(currentPassword, user.getPasswordHash())) {
+            return AuthResponse.builder()
+                    .success(false)
+                    .message("Current password is incorrect")
+                    .build();
+        }
+
+        // Check if new password is same as current
+        if (passwordEncoder.matches(newPassword, user.getPasswordHash())) {
+            return AuthResponse.builder()
+                    .success(false)
+                    .message("New password must be different from current password")
+                    .build();
+        }
+
+        // Validate password strength
+        if (newPassword.length() < 8) {
+            return AuthResponse.builder()
+                    .success(false)
+                    .message("Password must be at least 8 characters long")
+                    .build();
+        }
+
+        boolean hasUpperCase = newPassword.chars().anyMatch(Character::isUpperCase);
+        boolean hasLowerCase = newPassword.chars().anyMatch(Character::isLowerCase);
+        boolean hasDigit = newPassword.chars().anyMatch(Character::isDigit);
+        boolean hasSpecialChar = newPassword.matches(".*[!@#$%^&*(),.?\":{}|<>].*");
+
+        if (!hasUpperCase || !hasLowerCase || !hasDigit || !hasSpecialChar) {
+            return AuthResponse.builder()
+                    .success(false)
+                    .message("Password must contain uppercase, lowercase, number, and special character")
+                    .build();
+        }
+
+        // Update password
+        user.setPasswordHash(passwordEncoder.encode(newPassword));
+        userService.saveUser(user);
+
+        return AuthResponse.builder()
+                .success(true)
+                .message("Password changed successfully")
+                .build();
     }
 }

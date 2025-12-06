@@ -23,52 +23,27 @@ public class UserService {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
-    /**
-     * Find user by email address
-     *
-     * @param email User's email
-     * @return Optional containing user if found
-     */
+    
     public Optional<User> findByEmail(String email) {
         return userRepository.findByEmail(email);
     }
 
-    /**
-     * Find user by Google ID
-     *
-     * @param googleId Google's unique user identifier
-     * @return Optional containing user if found
-     */
+
     public Optional<User> findByGoogleId(String googleId) {
         return userRepository.findByGoogleId(googleId);
     }
 
-    /**
-     * Find user by username
-     *
-     * @param username User's username
-     * @return Optional containing user if found
-     */
+
     public Optional<User> findByUsername(String username) {
         return userRepository.findByUsername(username);
     }
 
-    /**
-     * Check if email exists in database
-     *
-     * @param email Email to check
-     * @return true if exists, false otherwise
-     */
+
     public boolean existsByEmail(String email) {
         return userRepository.existsByEmail(email);
     }
 
-    /**
-     * Create a new user from Google OAuth information
-     *
-     * @param googleInfo User information from Google
-     * @return Created user entity
-     */
+
     @Transactional
     public User createUserFromGoogle(GoogleUserInfo googleInfo) {
         // Generate username from Google name (FirstName LastName)
@@ -115,13 +90,7 @@ public class UserService {
         return userRepository.save(user);
     }
 
-    /**
-     * Update existing user with latest Google information
-     *
-     * @param user Existing user entity
-     * @param googleInfo Updated information from Google
-     * @return Updated user entity
-     */
+
     @Transactional
     public User updateUserFromGoogle(User user, GoogleUserInfo googleInfo) {
         // Update profile information
@@ -137,14 +106,7 @@ public class UserService {
         return userRepository.save(user);
     }
 
-    /**
-     * Find or create user from Google OAuth information.
-     * If user exists, updates their information.
-     * If user doesn't exist, creates a new one.
-     *
-     * @param googleInfo User information from Google
-     * @return User entity (existing or newly created)
-     */
+
     @Transactional
     public User findOrCreateGoogleUser(GoogleUserInfo googleInfo) {
         // Try to find by Google ID first
@@ -175,67 +137,34 @@ public class UserService {
         return createUserFromGoogle(googleInfo);
     }
 
-    /**
-     * Save user to database
-     *
-     * @param user User entity to save
-     * @return Saved user entity
-     */
+
     @Transactional
     public User saveUser(User user) {
         return userRepository.save(user);
     }
 
-    /**
-     * Update user's last login timestamp
-     *
-     * @param user User to update
-     * @return Updated user
-     */
+
     @Transactional
     public User updateLastLogin(User user) {
         user.setLastLoginAt(LocalDateTime.now());
         return userRepository.save(user);
     }
 
-    /**
-     * Get user by ID
-     *
-     * @param id User ID
-     * @return Optional containing user if found
-     */
+
     public Optional<User> findById(Long id) {
         return userRepository.findById(id);
     }
 
-    /**
-     * Check if user has admin role
-     *
-     * @param user User to check
-     * @return true if user is admin, false otherwise
-     */
+
     public boolean isAdmin(User user) {
         return user.hasRole(Role.ADMIN);
     }
 
-    /**
-     * Create a new user from signup request (traditional registration)
-     *
-     * @param signupRequest Signup request with user details
-     * @return Created user entity
-     */
+
     @Transactional
     public User createUserFromSignup(SignupRequest signupRequest) {
-        // Generate username from first and last name
-        String generatedUsername = signupRequest.getFirstName() + " " + signupRequest.getLastName();
-
-        // Ensure username is unique
-        String finalUsername = generatedUsername;
-        int counter = 1;
-        while (userRepository.existsByUsername(finalUsername)) {
-            finalUsername = generatedUsername + " " + counter;
-            counter++;
-        }
+        // Use email as username (email is guaranteed unique, no conflicts or number appending needed)
+        String finalUsername = signupRequest.getEmail();
 
         // Hash the password
         String hashedPassword = passwordEncoder.encode(signupRequest.getPassword());

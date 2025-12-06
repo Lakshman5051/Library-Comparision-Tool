@@ -87,7 +87,7 @@ public class PasswordResetService {
                 .orElse(false);
     }
 
-    
+
     @Transactional
     public void cleanupExpiredTokens() {
         tokenRepository.deleteByExpiryDateBefore(LocalDateTime.now());

@@ -107,7 +107,7 @@ public class EmailVerificationService {
         return true;
     }
 
-    
+
     @Transactional
     public boolean resendVerificationOTP(String email) {
         return sendVerificationOTP(email);

@@ -92,7 +92,7 @@ public class LoginOTPService {
         return user;
     }
 
-    
+
     @Transactional
     public boolean resendLoginOTP(String email) {
         return sendLoginOTP(email);
