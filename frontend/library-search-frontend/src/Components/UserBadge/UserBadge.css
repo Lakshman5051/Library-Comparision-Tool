@@ -65,6 +65,41 @@
   letter-spacing: 0.5px;
 }
 
+.user-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-left: auto;
+}
+
+.settings-btn {
+  padding: 0.5rem;
+  background: transparent;
+  color: #64748b;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.settings-btn:hover {
+  background: #f1f5f9;
+  color: #7c3aed;
+  transform: translateY(-1px);
+}
+
+.settings-btn svg {
+  transition: transform 0.2s ease;
+}
+
+.settings-btn:hover svg {
+  transform: scale(1.1);
+}
+
 .logout-btn {
   padding: 0.5rem 1rem;
   background: #e53e3e;
@@ -75,7 +110,6 @@
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
-  margin-left: auto;
 }
 
 .logout-btn:hover {
@@ -101,8 +135,17 @@
     font-size: 0.875rem;
   }
 
+  .user-actions {
+    gap: 0.5rem;
+  }
+
+  .home-btn,
   .logout-btn {
     padding: 0.4rem 0.75rem;
     font-size: 0.8rem;
+  }
+
+  .home-btn {
+    gap: 0.15rem;
   }
 }
