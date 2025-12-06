@@ -1,6 +1,6 @@
 .google-login-container {
   width: 100%;
-  margin: 20px 0;
+  margin: 0;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -8,10 +8,17 @@
 
 .google-login-container > div {
   width: 100%;
-  max-width: 400px;
+  max-width: 100%;
 }
 
-/* Ensure Google button takes full width */
 .google-login-container iframe {
   width: 100% !important;
+  border-radius: 10px !important;
+  border: 1.5px solid #e2e8f0 !important;
+  transition: all 0.2s ease !important;
+}
+
+.google-login-container iframe:hover {
+  border-color: #cbd5e1 !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05) !important;
 }
