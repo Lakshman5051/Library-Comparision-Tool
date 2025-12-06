@@ -1,0 +1,55 @@
+/**
+ * STEP 2B: UserRole Entity (Join Table)
+ * This links Users to their Roles
+ *
+ * Why a separate entity?
+ * - Allows one user to have multiple roles
+ * - Tracks when role was granted
+ * - Can track who granted the role
+ */
+
+ /**
+  * STEP 3: Project Entity
+  * This represents a user's project (e.g., "E-commerce Website")
+  *
+  * KEY RELATIONSHIP:
+  * - Each project belongs to ONE user
+  * - Each project can have MANY libraries
+  */
+
+  /**
+   * STEP 4: ProjectLibrary Entity (Join Table)
+   * This is THE KEY to linking projects and libraries!
+   *
+   * WHY THIS EXISTS:
+   * - A project can have MANY libraries (React, Express, PostgreSQL, etc.)
+   * - A library can be in MANY projects (React is used by 1000s of projects)
+   * - This is a MANY-TO-MANY relationship
+   * - We need a join table to connect them
+   *
+   * BONUS: We can add extra data about the relationship:
+   * - When was this library added to the project?
+   * - Is it required or optional?
+   * - Any notes about why it's included?
+   */
+
+
+   /**
+    * STEP 5: Favorite Entity (Join Table)
+    * This lets users "favorite" or "like" libraries
+    *
+    * RELATIONSHIP:
+    * - A user can favorite MANY libraries
+    * - A library can be favorited by MANY users
+    * - This is MANY-TO-MANY
+    *
+    * EXAMPLE:
+    * - User "John" favorites: React, Express, PostgreSQL
+    * - User "Sarah" favorites: React, Vue, MongoDB
+    * - React is favorited by both John and Sarah
+    */
+
+    /**
+     * STEP 6: Complete User Entity with ALL Relationships
+     * This is the final version that connects everything!
+     */

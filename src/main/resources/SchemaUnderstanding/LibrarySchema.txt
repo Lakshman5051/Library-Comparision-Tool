@@ -1,0 +1,68 @@
+/**
+     * Number of GitHub stars
+     * Indicates: Community popularity, trust level
+     * Use for: Sorting by popularity, showing trending libraries
+     */
+
+  /**
+      * Number of downloads in last 30 days
+      * Indicates: Actual usage, active adoption
+      * Use for: Finding most-used libraries, identifying active vs dead projects
+      */
+
+      /**
+           * Number of GitHub forks
+           * Indicates: How many developers modified/contributed
+           * Use for: Assessing contribution activity
+           */
+
+ /**
+      * Number of other projects that depend on this library
+      * Indicates: Real-world adoption, ecosystem impact
+      * Use for: Finding battle-tested libraries
+      */
+
+ /**
+      * When the library was last committed to
+      * Indicates: Active maintenance, not abandoned
+      * Use for: Filtering out dead projects
+      */
+
+ /**
+      * Whether the library is deprecated
+      * Indicates: Should not be used for new projects
+      * Use for: Warning users about obsolete libraries
+      */
+  /**
+        * Whether there are known security vulnerabilities
+        * Indicates: Security risk level
+        * Use for: Critical filtering for security-conscious users
+        */
+
+ /**
+      * Comma-separated keywords for search optimization
+      * Example: "json, serialization, fast, parsing, xml"
+      * Use for: Better search results
+      */
+
+ /**
+      * Tags for categorization and filtering
+      * Example: ["json", "xml", "fast", "popular"]
+      * Use for: Multi-tag filtering, related library suggestions
+      */
+
+ /**
+      * Calculate a popularity score for ranking
+      * Formula combines multiple metrics for better ranking
+      */
+
+ /**
+      * Check if library is actively maintained
+      * Returns true if last commit was within 6 months
+      */
+
+
+ /**
+      * Get a quality indicator (A, B, C, D, F)
+      * Based on multiple metrics
+      */
