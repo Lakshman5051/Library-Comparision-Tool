@@ -8,6 +8,15 @@ import Login from './Components/Login/Login';
 import UserBadge from './Components/UserBadge/UserBadge';
 import LibraryDetails from './Components/LibraryDetails/LibraryDetails';
 import Signup from './Components/Signup/Signup';
+import ComparisonView from './Components/ComparisonView/ComparisonView';
+import LandingPage from './Components/LandingPage/LandingPage';
+import Footer from './Components/Footer/Footer';
+import AboutUs from './Components/AboutUs/AboutUs';
+import TermsOfService from './Components/TermsOfService/TermsOfService';
+import PrivacyPolicy from './Components/PrivacyPolicy/PrivacyPolicy';
+import WelcomeOnboarding from './Components/WelcomeOnboarding/WelcomeOnboarding';
+import UserDashboard from './Components/UserDashboard/UserDashboard';
+import AccountManagement from './Components/AccountManagement/AccountManagement';
 
 // Services
 import { logout, getCurrentUser } from './Services/authService';
@@ -23,11 +32,17 @@ function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [showWelcome, setShowWelcome] = useState(false);
   const [showSignup, setShowSignup] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [showDashboard, setShowDashboard] = useState(false);
+  const [showLibrarySearch, setShowLibrarySearch] = useState(false);
+  const [showAccountManagement, setShowAccountManagement] = useState(false);
   
   // Core Data State
   const [libraries, setLibraries] = useState([]);
   const [selectedLibraries, setSelectedLibraries] = useState([]);
-  
+  const [comparisonCategory, setComparisonCategory] = useState(null); // Track category for comparison
+  const [showComparisonView, setShowComparisonView] = useState(false);
+
   // Detail View State
   const [selectedLibraryForDetails, setSelectedLibraryForDetails] = useState(null);
   
@@ -41,6 +56,10 @@ function App() {
   // UI State
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [showLandingPage, setShowLandingPage] = useState(true);
+  const [showAboutUs, setShowAboutUs] = useState(false);
+  const [showTermsModal, setShowTermsModal] = useState(false);
+  const [showPrivacyModal, setShowPrivacyModal] = useState(false);
 
   // Advanced Search State
 const [showAdvancedSearch, setShowAdvancedSearch] = useState(false);
@@ -52,22 +71,70 @@ const [lastCommitMonths, setLastCommitMonths] = useState('');
 const [includeGrades, setIncludeGrades] = useState(['A', 'B', 'C', 'D', 'F']);
 const [excludeDeprecated, setExcludeDeprecated] = useState(false);
 const [excludeSecurityIssues, setExcludeSecurityIssues] = useState(false);
-const [excludeUnmaintained, setExcludeUnmaintained] = useState(false);
+  const [excludeUnmaintained, setExcludeUnmaintained] = useState(false);
+
+  // Initialize theme from localStorage
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('theme') || 'light';
+    document.documentElement.setAttribute('data-theme', savedTheme);
+  }, []);
+
+  // Handle browser back/forward buttons
+  useEffect(() => {
+    const handlePopState = () => {
+      // When user presses back button, return to landing page
+      if (!isLoggedIn) {
+        setShowLandingPage(true);
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [isLoggedIn]);
 
   // Auth Handlers
   
   const handleLogin = (userData) => {
     setCurrentUser(userData);
     setIsLoggedIn(true);
-    setShowWelcome(true);
+    
+    // Check if this is a new user (first signup)
+    if (userData.isNewUser) {
+      // Show onboarding for new users
+      setShowOnboarding(true);
+      // Don't show dashboard yet - wait for "Let's go" button
+    } else {
+      // Existing users - show dashboard directly
+      setShowDashboard(true);
+      setShowLibrarySearch(false);
+    }
+  };
 
-    // Hide welcome message after 3 seconds
-    setTimeout(() => {
-      setShowWelcome(false);
-    }, 3000);
+  const handleOnboardingGetStarted = () => {
+    // User clicked "Let's go" - hide onboarding and show dashboard
+    setShowOnboarding(false);
+    setShowDashboard(true);
+    setShowLibrarySearch(false);
+  };
 
-    // Fetch real data from backend after login
+  const handleDashboardSearchLibraries = () => {
+    // User clicked "Search Libraries" - show library search and fetch data
+    setShowDashboard(false);
+    setShowLibrarySearch(true);
     fetchAllLibraries();
+  };
+
+  const handleDashboardCreateProject = () => {
+    // TODO: Implement create project functionality
+    alert('Create Project feature coming soon!');
+  };
+
+  const handleDashboardViewFavorites = () => {
+    // TODO: Implement favorites view
+    alert('Favorites feature coming soon!');
   };
 
   const handleLogout = async () => {
@@ -82,7 +149,15 @@ const [excludeUnmaintained, setExcludeUnmaintained] = useState(false);
       setCurrentUser(null);
       setLibraries([]);
       setSelectedLibraries([]);
+      setShowDashboard(false);
+      setShowLibrarySearch(false);
+      setShowOnboarding(false);
+      setShowAccountManagement(false);
       handleResetFilters();
+      // Redirect to landing page
+      setShowLandingPage(true);
+      // Scroll to top
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
@@ -192,17 +267,63 @@ const uniquePlatforms = useMemo(() => {
 }, [libraries]);
 
   const handleSelectLibrary = (library) => {
+    // Check if library is already selected
     if (selectedLibraries.find(lib => lib.id === library.id)) {
-      setSelectedLibraries(selectedLibraries.filter(lib => lib.id !== library.id));
-    } else if (selectedLibraries.length < 3) {
-      setSelectedLibraries([...selectedLibraries, library]);
-    } else {
-      alert('You can compare up to 3 libraries at a time');
+      // Remove from selection
+      const updatedLibraries = selectedLibraries.filter(lib => lib.id !== library.id);
+      setSelectedLibraries(updatedLibraries);
+
+      // Reset comparison category if no libraries selected
+      if (updatedLibraries.length === 0) {
+        setComparisonCategory(null);
+      }
+      return;
     }
+
+    // If this is the first library, set the comparison category
+    if (selectedLibraries.length === 0) {
+      setSelectedLibraries([library]);
+      setComparisonCategory(library.category);
+      return;
+    }
+
+    // Check if library matches the comparison category
+    if (comparisonCategory && library.category !== comparisonCategory) {
+      alert(`Please select libraries from the same category. Current comparison category: ${comparisonCategory}`);
+      return;
+    }
+
+    // Add to selection (no limit)
+    setSelectedLibraries([...selectedLibraries, library]);
   };
 
   const handleRemoveLibrary = (libraryId) => {
-    setSelectedLibraries(selectedLibraries.filter(lib => lib.id !== libraryId));
+    const updatedLibraries = selectedLibraries.filter(lib => lib.id !== libraryId);
+    setSelectedLibraries(updatedLibraries);
+
+    // Reset comparison category if no libraries selected
+    if (updatedLibraries.length === 0) {
+      setComparisonCategory(null);
+      setShowComparisonView(false);
+    }
+  };
+
+  const handleClearComparison = () => {
+    setSelectedLibraries([]);
+    setComparisonCategory(null);
+    setShowComparisonView(false);
+  };
+
+  const handleViewComparison = () => {
+    if (selectedLibraries.length < 2) {
+      alert('Please select at least 2 libraries to compare');
+      return;
+    }
+    setShowComparisonView(true);
+  };
+
+  const handleCloseComparisonView = () => {
+    setShowComparisonView(false);
   };
 
   const handleViewDetails = (library, event) => {
@@ -297,7 +418,7 @@ const handleAdvancedSearch = async () => {
 };
 
 // Reset advanced filters
-const handleResetAdvancedFilters = () => {
+  const handleResetAdvancedFilters = () => {
   setSelectedCategories([]);
   setSelectedPlatforms([]);
   setStarRange({ min: '', max: '' });
@@ -312,22 +433,226 @@ const handleResetAdvancedFilters = () => {
   fetchAllLibraries(); // Back to showing all
 };
 
-  // login screen
+  // Handler for getting started from landing page (triggers login)
+  const handleGetStarted = () => {
+    // If not logged in, this will show the login form
+    // If logged in, navigate to the library explorer
+    if (!isLoggedIn) {
+      setShowLandingPage(false);
+    } else {
+      setShowLandingPage(false);
+      fetchAllLibraries();
+    }
+  };
+
+  // Handler to go back to dashboard (for logged in users) or landing page (for non-logged in)
+  const handleGoHome = () => {
+    if (isLoggedIn) {
+      // Logged in users go to dashboard
+      setShowLandingPage(false);
+      setShowLibrarySearch(false);
+      setShowDashboard(true);
+    } else {
+      // Non-logged in users go to landing page
+      setShowLandingPage(true);
+    }
+    setSelectedLibraries([]);
+    setComparisonCategory(null);
+    setShowComparisonView(false);
+    setShowAboutUs(false);
+    // Scroll to top of page
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleShowAboutUs = () => {
+    setShowAboutUs(true);
+    setShowLandingPage(false);
+  };
+
+  const handleBackFromAboutUs = () => {
+    setShowAboutUs(false);
+    setShowLandingPage(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleShowTerms = () => {
+    setShowTermsModal(true);
+  };
+
+  const handleShowPrivacy = () => {
+    setShowPrivacyModal(true);
+  };
+
+  // Handler to show login from header
+  const handleShowLogin = () => {
+    setShowLandingPage(false);
+    setShowSignup(false);
+    // Add to browser history
+    window.history.pushState({ page: 'login' }, 'Login', '#login');
+  };
+
+  // Handler to show signup from header
+  const handleShowSignup = () => {
+    setShowLandingPage(false);
+    setShowSignup(true);
+    // Add to browser history
+    window.history.pushState({ page: 'signup' }, 'Sign Up', '#signup');
+  };
+
+  // Handler to go back to landing page
+  const handleBackToLanding = () => {
+    setShowLandingPage(true);
+    setShowSignup(false);
+    // Go back in browser history
+    window.history.back();
+  };
+
+  // Show About Us page
+  if (showAboutUs) {
+    return (
+      <div className="app">
+        <AboutUs onBack={handleBackFromAboutUs} />
+        <Footer 
+          onHome={handleGoHome}
+          onAboutUs={handleShowAboutUs}
+          onTerms={handleShowTerms}
+          onPrivacy={handleShowPrivacy}
+        />
+        {showTermsModal && <TermsOfService onClose={() => setShowTermsModal(false)} />}
+        {showPrivacyModal && <PrivacyPolicy onClose={() => setShowPrivacyModal(false)} />}
+      </div>
+    );
+  }
+
+  // Show landing page FIRST (before login)
+  if (!isLoggedIn && showLandingPage) {
+    return (
+      <div className="app">
+        {/* Header Component without navigation */}
+        <Header 
+          onHome={handleGoHome}
+          isLoggedIn={false}
+          currentUser={null}
+          onLogin={handleShowLogin}
+          onSignup={handleShowSignup}
+        />
+        <LandingPage onGetStarted={handleGetStarted} />
+        <Footer 
+          onHome={handleGoHome}
+          onAboutUs={handleShowAboutUs}
+          onTerms={handleShowTerms}
+          onPrivacy={handleShowPrivacy}
+        />
+        {showTermsModal && <TermsOfService onClose={() => setShowTermsModal(false)} />}
+        {showPrivacyModal && <PrivacyPolicy onClose={() => setShowPrivacyModal(false)} />}
+      </div>
+    );
+  }
   
+  // Show login screen when user clicks login
   if (!isLoggedIn) {
     return <>
-      <Login onLogin={handleLogin} onSignup={handleOpenSignup} />
+      <Login 
+        onLogin={handleLogin} 
+        onSignup={handleOpenSignup}
+        onBack={handleBackToLanding}
+      />
       {showSignup && (
         <React.Suspense fallback={null}>
           {/* Signup modal with real backend integration */}
-          <Signup onClose={handleCloseSignup} onLogin={handleLogin} />
+          <Signup 
+            onClose={handleCloseSignup} 
+            onLogin={handleLogin}
+            onTerms={handleShowTerms}
+            onPrivacy={handleShowPrivacy}
+            onBackToHome={handleBackToLanding}
+          />
         </React.Suspense>
       )}
+      {showTermsModal && <TermsOfService onClose={() => setShowTermsModal(false)} />}
+      {showPrivacyModal && <PrivacyPolicy onClose={() => setShowPrivacyModal(false)} />}
     </>;
   }
 
-  // welcome notification
-  
+  // Show landing page after login
+  if (showLandingPage && isLoggedIn) {
+    return (
+      <div className="app">
+        {/* Header Component */}
+        <Header 
+          onHome={handleGoHome}
+          isLoggedIn={true}
+          currentUser={currentUser}
+        >
+          <UserBadge user={currentUser} onLogout={handleLogout} />
+        </Header>
+        <LandingPage onGetStarted={handleGetStarted} />
+        <Footer 
+          onHome={handleGoHome}
+          onAboutUs={handleShowAboutUs}
+          onTerms={handleShowTerms}
+          onPrivacy={handleShowPrivacy}
+        />
+        {showTermsModal && <TermsOfService onClose={() => setShowTermsModal(false)} />}
+        {showPrivacyModal && <PrivacyPolicy onClose={() => setShowPrivacyModal(false)} />}
+      </div>
+    );
+  }
+
+  // Show onboarding for new users (before dashboard)
+  if (showOnboarding && isLoggedIn && currentUser) {
+    const displayName = currentUser.firstName && currentUser.lastName
+      ? `${currentUser.firstName} ${currentUser.lastName}`
+      : currentUser.username || currentUser.email || 'there';
+    
+    return (
+      <WelcomeOnboarding
+        username={displayName}
+        onGetStarted={handleOnboardingGetStarted}
+      />
+    );
+  }
+
+  // Show User Dashboard
+  if (showDashboard && isLoggedIn && currentUser && !showLibrarySearch) {
+    return (
+      <div className="app">
+        <Header 
+          onHome={handleGoHome}
+          isLoggedIn={true}
+          currentUser={currentUser}
+        >
+          <UserBadge 
+            user={currentUser} 
+            onLogout={handleLogout} 
+            onAccountSettings={() => setShowAccountManagement(true)} 
+          />
+        </Header>
+        <UserDashboard
+          onSearchLibraries={handleDashboardSearchLibraries}
+          onCreateProject={handleDashboardCreateProject}
+          onViewFavorites={handleDashboardViewFavorites}
+        />
+        <Footer 
+          onHome={handleGoHome}
+          onAboutUs={handleShowAboutUs}
+          onTerms={handleShowTerms}
+          onPrivacy={handleShowPrivacy}
+        />
+        {showTermsModal && <TermsOfService onClose={() => setShowTermsModal(false)} />}
+        {showPrivacyModal && <PrivacyPolicy onClose={() => setShowPrivacyModal(false)} />}
+        {showAccountManagement && (
+          <AccountManagement
+            user={currentUser}
+            onClose={() => setShowAccountManagement(false)}
+            onUpdateUser={(updatedUser) => setCurrentUser(updatedUser)}
+          />
+        )}
+      </div>
+    );
+  }
+
+  // Main app view (Library Search)
   return (
     <div className="app">
       {/* Welcome Notification */}
@@ -335,15 +660,21 @@ const handleResetAdvancedFilters = () => {
         <div className="welcome-notification">
           <div className="welcome-content">
             <div className="welcome-text">
-              <strong>Hey, {currentUser.username}!</strong>
+              <strong>Hey, {currentUser.firstName && currentUser.lastName 
+                ? `${currentUser.firstName} ${currentUser.lastName}` 
+                : currentUser.username || currentUser.email}!</strong>
             </div>
           </div>
         </div>
       )}
 
       {/* Header Component */}
-      <Header>
-        <UserBadge user={currentUser} onLogout={handleLogout} />
+      <Header 
+        onHome={handleGoHome}
+        isLoggedIn={true}
+        currentUser={currentUser}
+      >
+        <UserBadge user={currentUser} onLogout={handleLogout} onHome={handleGoHome} />
       </Header>
 
       {/* Main Content Container */}
@@ -580,137 +911,217 @@ const handleResetAdvancedFilters = () => {
   </div>
 </section>
 
-        {/* INLINE LIBRARY SELECTOR (when libraries selected) */}
+        {/* FLOATING COMPARISON BAR (when libraries selected) */}
         {selectedLibraries.length > 0 && (
-          <section className="selector-section">
-            <div className="selected-libraries">
-              <h3>Selected for Comparison ({selectedLibraries.length}/3)</h3>
-              <div className="selected-grid">
+          <div className="comparison-bar">
+            <div className="comparison-bar-content">
+              <div className="comparison-bar-header">
+                <h3>Comparison Queue ({selectedLibraries.length} libraries)</h3>
+                {comparisonCategory && (
+                  <span className="comparison-category">Category: {comparisonCategory}</span>
+                )}
+              </div>
+              <div className="comparison-bar-libraries">
                 {selectedLibraries.map(lib => (
-                  <div key={lib.id} className="selected-card">
-                    <span>{lib.name}</span>
-                    <button 
+                  <div key={lib.id} className="comparison-bar-item">
+                    <span className="lib-name">{lib.name}</span>
+                    <button
                       className="remove-btn"
                       onClick={() => handleRemoveLibrary(lib.id)}
+                      title="Remove from comparison"
                     >
                       ✕
                     </button>
                   </div>
                 ))}
               </div>
+              <div className="comparison-bar-actions">
+                <button
+                  className="compare-btn"
+                  onClick={handleViewComparison}
+                  disabled={selectedLibraries.length < 2}
+                >
+                  🔍 Compare Now ({selectedLibraries.length})
+                </button>
+                <button
+                  className="clear-btn"
+                  onClick={handleClearComparison}
+                >
+                  Clear All
+                </button>
+              </div>
             </div>
-          </section>
+          </div>
         )}
 
-        {/* COMPARISON VIEW OR LIBRARY LIST */}
-        {selectedLibraries.length >= 2 ? (
-          <section className="comparison-section">
-            <h2>Comparison View</h2>
-            <div className="comparison-grid">
-              {selectedLibraries.map(lib => (
-                <div key={lib.id} className="comparison-card">
-                  <h3>{lib.name}</h3>
-                  <div className="comparison-stats">
-                    <div className="stat">
-                      <span className="label">GitHub Stars:</span>
-                      <span className="value">{lib.githubStars?.toLocaleString() || 'N/A'}</span>
+        {/* LIBRARY LIST */}
+        <section className="library-list-section">
+          {isLoading ? (
+            <div className="loading-state">
+              <p>Loading libraries...</p>
+            </div>
+          ) : error ? (
+            <div className="error-state">
+              <p>{error}</p>
+              <button onClick={fetchAllLibraries}>Retry</button>
+            </div>
+          ) : filteredLibraries.length === 0 ? (
+            <div className="empty-state">
+              <p>No libraries found matching your criteria.</p>
+              <button onClick={handleResetFilters}>Clear Filters</button>
+            </div>
+          ) : (
+            <div className="library-grid">
+              {filteredLibraries.map(library => (
+                <div
+                  key={library.id}
+                  className={`library-card ${selectedLibraries.find(lib => lib.id === library.id) ? 'selected' : ''}`}
+                  onClick={() => handleSelectLibrary(library)}
+                >
+                  {/* Header Section */}
+                  <div className="library-card-header">
+                    <div className="library-card-title-row">
+                      <h3 className="library-card-title-large">{library.name}</h3>
+                      {library.latestVersion && (
+                        <span className="library-card-version-badge">v{library.latestVersion}</span>
+                      )}
                     </div>
-                    <div className="stat">
-                      <span className="label">Used By:</span>
-                      <span className="value">
-                        {formatDependents(lib.dependentProjectsCount)} repositories
-                      </span>
-                    </div>
-                    <div className="stat">
-                      <span className="label">Forks:</span>
-                      <span className="value">{lib.githubForks?.toLocaleString() || 'N/A'}</span>
-                    </div>
-                    <div className="stat">
-                      <span className="label">Category:</span>
-                      <span className="value">{lib.category || 'N/A'}</span>
-                    </div>
-                    <div className="stat">
-                      <span className="label">Platform:</span>
-                      <span className="value">{lib.packageManager || 'N/A'}</span>
-                    </div>
-                    <div className="stat">
-                      <span className="label">Quality Grade:</span>
-                      <span className="value badge-grade">{lib.qualityGrade || 'N/A'}</span>
-                    </div>
-                    <div className="stat">
-                      <span className="label">Active Maintenance:</span>
-                      <span className="value">{lib.activelyMaintained ? '✓ Yes' : '✗ No'}</span>
-                    </div>
-                    <div className="stat">
-                      <span className="label">Latest Version:</span>
-                      <span className="value">{lib.latestVersion || 'N/A'}</span>
+                    <div className="library-card-meta-row">
+                      {library.lastUpdated && (
+                        <span className="library-card-updated">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                            <line x1="16" y1="2" x2="16" y2="6"/>
+                            <line x1="8" y1="2" x2="8" y2="6"/>
+                            <line x1="3" y1="10" x2="21" y2="10"/>
+                          </svg>
+                          Updated on {library.lastUpdated}
+                        </span>
+                      )}
+                      {library.githubStars && (
+                        <>
+                          <span className="library-card-meta-separator">•</span>
+                          <span className="library-card-stars">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2">
+                              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                            </svg>
+                            {library.githubStars.toLocaleString()}
+                          </span>
+                        </>
+                      )}
                     </div>
                   </div>
+                  
+                  {/* Description */}
+                  {library.description && (
+                    <p className="library-card-description">{library.description}</p>
+                  )}
+                  
+                  {/* Key Attributes - Two Columns */}
+                  <div className="library-card-attributes">
+                    <div className="library-card-attributes-left">
+                      {library.category && (
+                        <div className="library-card-attribute-item">
+                          <span className="library-card-attribute-label">Category:</span>
+                          <span className="library-card-attribute-value">{library.category}</span>
+                        </div>
+                      )}
+                      {library.cost && (
+                        <div className="library-card-attribute-item">
+                          <span className="library-card-attribute-label">Cost:</span>
+                          <span className="library-card-attribute-value">{library.cost}</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="library-card-attributes-right">
+                      {library.licenseType && (
+                        <div className="library-card-attribute-item">
+                          <span className="library-card-attribute-label">License:</span>
+                          <span className="library-card-attribute-value">{library.licenseType}</span>
+                        </div>
+                      )}
+                      {library.packageManager && (
+                        <div className="library-card-attribute-item">
+                          <span className="library-card-attribute-label">Platform:</span>
+                          <span className="library-card-attribute-value">{library.packageManager}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  
+                  {/* Compatible With Section */}
+                  {(library.supportedOs && library.supportedOs.length > 0) && (
+                    <div className="library-card-compatible-section">
+                      <span className="library-card-compatible-label">Compatible with:</span>
+                      <div className="library-card-compatible-badges">
+                        {library.supportedOs.length === 1 && library.supportedOs[0] === 'Cross-platform' ? (
+                          <span className="library-card-compatible-badge">Cross-platform</span>
+                        ) : (
+                          library.supportedOs.slice(0, 3).map((os, osIndex) => (
+                            <span key={osIndex} className="library-card-compatible-badge">{os}</span>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Tags Section */}
+                  {library.tags && library.tags.length > 0 && (
+                    <div className="library-card-tags-section">
+                      {library.tags.slice(0, 4).map((tag, tagIndex) => (
+                        <span key={tagIndex} className="library-card-tag-badge">{tag}</span>
+                      ))}
+                    </div>
+                  )}
+                  
+                  {/* View Details Link */}
+                  <button
+                    className="view-details-link"
+                    onClick={(e) => handleViewDetails(library, e)}
+                  >
+                    View Details
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M7 17L17 7M7 7h10v10"/>
+                    </svg>
+                  </button>
                 </div>
               ))}
             </div>
-          </section>
-        ) : (
-          <section className="library-list-section">
-            {isLoading ? (
-              <div className="loading-state">
-                <p>Loading libraries...</p>
-              </div>
-            ) : error ? (
-              <div className="error-state">
-                <p>{error}</p>
-                <button onClick={fetchAllLibraries}>Retry</button>
-              </div>
-            ) : filteredLibraries.length === 0 ? (
-              <div className="empty-state">
-                <p>No libraries found matching your criteria.</p>
-                <button onClick={handleResetFilters}>Clear Filters</button>
-              </div>
-            ) : (
-              <div className="library-grid">
-                {filteredLibraries.map(library => (
-                  <div 
-                    key={library.id} 
-                    className={`library-card ${selectedLibraries.find(lib => lib.id === library.id) ? 'selected' : ''}`}
-                    onClick={() => handleSelectLibrary(library)}
-                  >
-                    <h3>{library.name}</h3>
-                    <p className="description">{library.description}</p>
-                    <div className="library-stats">
-                      <span>⭐ {library.githubStars?.toLocaleString() || 'N/A'}</span>
-                      <span>🔗 {formatDependents(library.dependentProjectsCount)} repos</span>
-                    </div>
-                    <div className="library-badges">
-                      <span className="badge">{library.packageManager}</span>
-                      {library.qualityGrade && (
-                        <span className="badge grade">{library.qualityGrade}</span>
-                      )}
-                    </div>
-                    <button 
-                      className="view-details-btn"
-                      onClick={(e) => handleViewDetails(library, e)}
-                    >
-                      📋 View Details
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
-        )}
+          )}
+        </section>
 
       </main>
 
-      {/* INLINE FOOTER */}
-      <footer className="footer">
-        <p>Library Comparator Application ©Lakshman</p>
-      </footer>
+      <Footer 
+        onHome={handleGoHome}
+        onAboutUs={handleShowAboutUs}
+        onTerms={handleShowTerms}
+        onPrivacy={handleShowPrivacy}
+      />
+      {showTermsModal && <TermsOfService onClose={() => setShowTermsModal(false)} />}
+      {showPrivacyModal && <PrivacyPolicy onClose={() => setShowPrivacyModal(false)} />}
+      {showAccountManagement && (
+        <AccountManagement
+          user={currentUser}
+          onClose={() => setShowAccountManagement(false)}
+          onUpdateUser={(updatedUser) => setCurrentUser(updatedUser)}
+        />
+      )}
 
       {/* Library Details Modal */}
       {selectedLibraryForDetails && (
-        <LibraryDetails 
-          library={selectedLibraryForDetails} 
+        <LibraryDetails
+          library={selectedLibraryForDetails}
           onClose={handleCloseDetails}
+        />
+      )}
+
+      {/* Comparison View Modal */}
+      {showComparisonView && selectedLibraries.length >= 2 && (
+        <ComparisonView
+          libraries={selectedLibraries}
+          onClose={handleCloseComparisonView}
+          onRemoveLibrary={handleRemoveLibrary}
         />
       )}
     </div>
