@@ -1,0 +1,27 @@
+# Railway deployment configuration
+# Deploys backend only when a version tag is pushed (e.g., v1.0.0, v1.2.3)
+# This prevents automatic deployment on every commit to protect production users
+
+services:
+  backend:
+    source: .
+    deploy:
+      on:
+        event: tag
+        pattern: "v*"
+
+    # Build configuration
+    build:
+      # Railway will auto-detect Maven and use: mvn clean install -DskipTests
+      buildCommand: mvn clean package -DskipTests
+
+    # Runtime configuration
+    startCommand: java -jar target/library-comparison-tool-0.0.1-SNAPSHOT.jar
+
+    # Health check (optional but recommended)
+    healthcheckPath: /api/auth/current-user
+    healthcheckTimeout: 300
+
+    # Restart policy
+    restartPolicyType: on-failure
+    restartPolicyMaxRetries: 3
