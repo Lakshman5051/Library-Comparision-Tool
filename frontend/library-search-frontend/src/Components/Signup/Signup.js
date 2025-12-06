@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import './Signup.css';
 import { signup } from '../../Services/authService';
+import EmailVerification from '../EmailVerification/EmailVerification';
 
-function Signup({ onClose, onLogin }) {
+function Signup({ onClose, onLogin, onTerms, onPrivacy, onBackToHome }) {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
@@ -12,6 +13,8 @@ function Signup({ onClose, onLogin }) {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [emailTouched, setEmailTouched] = useState(false);
+  const [showEmailVerification, setShowEmailVerification] = useState(false);
+  const [signupResponse, setSignupResponse] = useState(null);
 
   // Email validation helper
   const isEmailValid = (emailValue) => {
@@ -71,19 +74,11 @@ function Signup({ onClose, onLogin }) {
       const response = await signup(signupData);
 
       if (response.success) {
-        // Auto-login after successful signup
-        onLogin({
-          userId: response.userId,
-          username: response.username,
-          email: response.email,
-          firstName: response.firstName,
-          lastName: response.lastName,
-          profilePictureUrl: response.profilePictureUrl,
-          role: response.role,
-          authProvider: response.authProvider
-        });
-
-        if (onClose) onClose();
+        // Store signup response for after verification
+        setSignupResponse(response);
+        
+        // OTP is already sent by backend, just show verification modal
+        setShowEmailVerification(true);
       } else {
         setError(response.message || 'Signup failed');
       }
@@ -94,8 +89,32 @@ function Signup({ onClose, onLogin }) {
     }
   };
 
+  const handleOverlayClick = () => {
+    if (onBackToHome) {
+      onBackToHome();
+    } else if (onClose) {
+      onClose();
+    }
+  };
+
+  const handleTermsClick = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (onTerms) {
+      onTerms();
+    }
+  };
+
+  const handlePrivacyClick = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (onPrivacy) {
+      onPrivacy();
+    }
+  };
+
   return (
-    <div className="signup-overlay" onClick={onClose}>
+    <div className="signup-overlay" onClick={handleOverlayClick}>
       <div className="signup-card" onClick={(e) => e.stopPropagation()}>
         <h2>Create an Account</h2>
         <form className="signup-form" onSubmit={handleSubmit} autoComplete="off">
@@ -158,7 +177,17 @@ function Signup({ onClose, onLogin }) {
 
           <label className="terms">
             <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} required />
-            <span>I agree to the Terms of Service and Privacy Policy <span className="required">*</span></span>
+            <span>
+              I agree to the{' '}
+              <a href="#terms" onClick={handleTermsClick} className="terms-link">
+                Terms of Service
+              </a>
+              {' '}and{' '}
+              <a href="#privacy" onClick={handlePrivacyClick} className="terms-link">
+                Privacy Policy
+              </a>
+              {' '}<span className="required">*</span>
+            </span>
           </label>
 
           <div className="actions">
@@ -176,6 +205,36 @@ function Signup({ onClose, onLogin }) {
           </div>
         </form>
       </div>
+
+      {/* Email Verification Modal */}
+      {showEmailVerification && (
+        <EmailVerification
+          email={email}
+          onVerified={(response) => {
+            // Email verified - now login the user with response data
+            if (onLogin) {
+              onLogin({
+                userId: response.userId || signupResponse.userId,
+                username: response.username || signupResponse.username,
+                email: response.email || signupResponse.email,
+                firstName: response.firstName || signupResponse.firstName,
+                lastName: response.lastName || signupResponse.lastName,
+                profilePictureUrl: response.profilePictureUrl || signupResponse.profilePictureUrl,
+                role: response.role || signupResponse.role,
+                authProvider: response.authProvider || signupResponse.authProvider,
+                emailVerified: true,
+                isNewUser: response.isNewUser !== undefined ? response.isNewUser : true // Use backend flag or default to true
+              });
+            }
+            if (onClose) onClose();
+          }}
+          onClose={() => {
+            setShowEmailVerification(false);
+            // Optionally close signup modal too
+            if (onClose) onClose();
+          }}
+        />
+      )}
     </div>
   );
 }
