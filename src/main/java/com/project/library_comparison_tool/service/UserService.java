@@ -23,7 +23,7 @@ public class UserService {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
-    
+
     public Optional<User> findByEmail(String email) {
         return userRepository.findByEmail(email);
     }
