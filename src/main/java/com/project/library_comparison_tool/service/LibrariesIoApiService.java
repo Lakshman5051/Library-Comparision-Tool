@@ -15,16 +15,16 @@ import java.util.List;
 @Service
 public class LibrariesIoApiService {
 
-    @Value("${libraries.io.api.key}")
-    private String apiKey;
-
-    @Value("${libraries.io.api.base-url}")
-    private String baseUrl;
-
+    private final String apiKey;
+    private final String baseUrl;
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
 
-    public LibrariesIoApiService() {
+    public LibrariesIoApiService(
+            @Value("${libraries.io.api.key:}") String apiKey,
+            @Value("${libraries.io.api.base-url:https://libraries.io/api}") String baseUrl) {
+        this.apiKey = apiKey;
+        this.baseUrl = baseUrl;
         this.restTemplate = new RestTemplate();
         this.objectMapper = new ObjectMapper();
     }
@@ -37,6 +37,11 @@ public class LibrariesIoApiService {
      * @return List of JsonNode objects (raw API response)
      */
     public List<JsonNode> searchLibraries(String query, String platform, int page) {
+        if (apiKey == null || apiKey.trim().isEmpty()) {
+            System.err.println("Libraries.io API key is not configured. Please set LIBRARIES_IO_API_KEY environment variable.");
+            return new ArrayList<>();
+        }
+        
         String url = UriComponentsBuilder.fromHttpUrl(baseUrl + "/search")
                 .queryParam("q", query)
                 .queryParam("platforms", platform)
@@ -70,6 +75,11 @@ public class LibrariesIoApiService {
      * @return JsonNode with library details
      */
     public JsonNode getLibraryDetails(String platform, String name) {
+        if (apiKey == null || apiKey.trim().isEmpty()) {
+            System.err.println("Libraries.io API key is not configured. Please set LIBRARIES_IO_API_KEY environment variable.");
+            return null;
+        }
+        
         String url = UriComponentsBuilder.fromHttpUrl(baseUrl + "/" + platform + "/" + name)
                 .queryParam("api_key", apiKey)
                 .toUriString();
@@ -93,6 +103,11 @@ public class LibrariesIoApiService {
      * @return JsonNode with dependencies
      */
     public JsonNode getLibraryDependencies(String platform, String name, String version) {
+        if (apiKey == null || apiKey.trim().isEmpty()) {
+            System.err.println("Libraries.io API key is not configured. Please set LIBRARIES_IO_API_KEY environment variable.");
+            return null;
+        }
+        
         String url = UriComponentsBuilder.fromHttpUrl(
                         baseUrl + "/" + platform + "/" + name + "/" + version + "/dependencies")
                 .queryParam("api_key", apiKey)

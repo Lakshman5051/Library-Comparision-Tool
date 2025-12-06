@@ -16,18 +16,16 @@ import java.util.Collections;
 @Service
 public class GoogleOAuthService {
 
-    @Value("${google.oauth.client-id}")
+    @Value("${google.oauth.client-id:}")
     private String googleClientId;
 
-    /**
-     * Verify Google ID token and extract user information.
-     *
-     * @param idToken The ID token received from Google OAuth
-     * @return GoogleUserInfo containing user profile data
-     * @throws GeneralSecurityException if token verification fails
-     * @throws IOException if network error occurs
-     */
+    //verify
     public GoogleUserInfo verifyGoogleToken(String idToken) throws GeneralSecurityException, IOException {
+        // Validate Google Client ID is configured
+        if (googleClientId == null || googleClientId.trim().isEmpty()) {
+            throw new IllegalStateException("Google OAuth Client ID is not configured. Please set GOOGLE_OAUTH_CLIENT_ID environment variable.");
+        }
+        
         // Create verifier with your Google Client ID
         GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(
                 new NetHttpTransport(),
@@ -67,13 +65,7 @@ public class GoogleOAuthService {
                 .build();
     }
 
-    /**
-     * Validate if a Google token is well-formed and not expired.
-     * This is a lightweight check without full verification.
-     *
-     * @param idToken The ID token to validate
-     * @return true if token appears valid, false otherwise
-     */
+    //validate
     public boolean isValidTokenFormat(String idToken) {
         if (idToken == null || idToken.trim().isEmpty()) {
             return false;
