@@ -63,8 +63,8 @@ public class AuthService {
         session.setAttribute("userEmail", user.getEmail());
         session.setAttribute("authProvider", user.getAuthProvider().toString());
         // Store user role for Spring Security
-        String primaryRole = user.hasRole(Role.ADMIN) ? "ADMIN" : "USER";
-        session.setAttribute("userRole", primaryRole);
+        String userRole = user.getRole().toString().replace("ROLE_", "");
+        session.setAttribute("userRole", userRole);
 
         // Step 5: Build and return response
         return buildAuthResponse(user, isNewUser, "Login successful");
@@ -136,8 +136,9 @@ public class AuthService {
      * @return AuthResponse DTO
      */
     private AuthResponse buildAuthResponse(User user, boolean isNewUser, String message) {
-        // Get primary role
-        String primaryRole = user.hasRole(Role.ADMIN) ? "ADMIN" : "USER";
+        // Get user's role
+        Role userRole = user.getRole();
+        String roleString = userRole.toString().replace("ROLE_", "");
 
         return AuthResponse.builder()
                 .success(true)
@@ -147,8 +148,8 @@ public class AuthService {
                 .firstName(user.getFirstName())
                 .lastName(user.getLastName())
                 .profilePictureUrl(user.getProfilePictureUrl())
-                .roles(user.getRoles())
-                .role(primaryRole)
+                .roles(java.util.Set.of(userRole)) // Convert single role to Set for backward compatibility
+                .role(roleString)
                 .authProvider(user.getAuthProvider().toString())
                 .isNewUser(isNewUser)
                 .message(message)
@@ -235,8 +236,8 @@ public class AuthService {
         session.setAttribute("userEmail", user.getEmail());
         session.setAttribute("authProvider", user.getAuthProvider().toString());
         // Store user role for Spring Security
-        String primaryRole = user.hasRole(Role.ADMIN) ? "ADMIN" : "USER";
-        session.setAttribute("userRole", primaryRole);
+        String userRole = user.getRole().toString().replace("ROLE_", "");
+        session.setAttribute("userRole", userRole);
 
         // Return response
         return buildAuthResponse(user, false, "Login successful");
