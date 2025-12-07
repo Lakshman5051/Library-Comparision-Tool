@@ -2,6 +2,8 @@ package com.project.library_comparison_tool.dto;
 
 import com.project.library_comparison_tool.entity.Library;
 import com.project.library_comparison_tool.entity.LibraryDependency;
+import com.project.library_comparison_tool.entity.Vulnerability;
+import com.project.library_comparison_tool.service.ComparisonService;
 import lombok.*;
 
 import java.time.LocalDate;
@@ -15,67 +17,81 @@ import java.util.stream.Collectors;
 public class LibraryDTO {
     private Long id;
     private String name;
-    private String category;
     private String description;
 
-    private String categories;
+    private String categories; // Comma-separated list of categories
 
     private String framework;
     private String runtimeEnvironment;
     private String language;
     private String packageManager;
 
-    private String supplier;
     private String licenseType;
     private String cost;
 
     private String latestVersion;
-    private String lastUpdated;
+    private String lastRegistryReleaseDate; // From package registry
 
     // metrics for comparision
     private Integer githubStars;
-    private Long downloadsLast30Days;
     private Integer githubForks;
     private Integer dependentProjectsCount;
-    private LocalDate lastCommitDate;
+    private LocalDate lastRepositoryReleaseDate; // From GitHub/GitLab repository
     private Boolean isDeprecated;
     private Boolean hasSecurityVulnerabilities;
+    private Integer vulnerabilityCount; // Count of known vulnerabilities
+    private List<VulnerabilityDTO> vulnerabilities; // Full vulnerability details
 
     private String homepageUrl;
     private String repositoryUrl;
     private String documentationUrl;
     private String packageUrl;
 
-
-    private String keywords;
     private List<String> tags;
     private List<String> supportedOs;
 
-    private String exampleCodeSnippet;
-
+    private String exampleCodeSnippet; // Code example showing how to use the library
+    private String useCase; // Plain English description of when/why to use this library
 
     private List<String> dependencyNames;
     private Integer dependencyCount;
 
-    // popularity score ranking
+    // Comparison scores (from ComparisonService)
     private Double popularityScore;
-
+    private Double maintenanceScore;
+    private Double securityScore;
+    private Double communityScore;
+    private Double qualityScore;
+    private Double overallScore;
+    
     // quality grade(A,B,C)
     private String qualityGrade;
 
     // maintained actively this library or not
     private Boolean activelyMaintained;
+    
+    // Vulnerability severity score (weighted)
+    private Integer vulnerabilitySeverityScore;
 
     //formatting the display
     private String popularityDisplay;
 
-    // no. of downloads
-    private String downloadsDisplay;
 
-
+    // Overloaded method for backward compatibility (uses deprecated methods)
     public static LibraryDTO fromEntity(Library library) {
+        return fromEntity(library, null);
+    }
+    
+    // Main method with ComparisonService
+    public static LibraryDTO fromEntity(Library library, ComparisonService comparisonService) {
         if (library == null) {
             return null;
+        }
+        
+        // Calculate comparison scores using unified ComparisonService if available
+        ComparisonService.ComparisonResult comparison = null;
+        if (comparisonService != null) {
+            comparison = comparisonService.calculateComparison(library);
         }
 
         // Extract dependency information
@@ -94,7 +110,6 @@ public class LibraryDTO {
 
                 .id(library.getId())
                 .name(library.getName())
-                .category(library.getCategory())
                 .categories(library.getCategories())
                 .description(library.getDescription())
 
@@ -105,23 +120,25 @@ public class LibraryDTO {
                 .packageManager(library.getPackageManager())
 
 
-                .supplier(library.getSupplier())
                 .licenseType(library.getLicenseType())
                 .cost(library.getCost())
 
 
                 .latestVersion(library.getLatestVersion())
-                .lastUpdated(library.getLastUpdated())
+                .lastRegistryReleaseDate(library.getLastRegistryReleaseDate())
 
                 // Popularity metrics
                 .githubStars(library.getGithubStars())
-                .downloadsLast30Days(library.getDownloadsLast30Days())
                 .githubForks(library.getGithubForks())
                 .dependentProjectsCount(library.getDependentProjectsCount())
-                .lastCommitDate(library.getLastCommitDate())
+                .lastRepositoryReleaseDate(library.getLastRepositoryReleaseDate())
                 .isDeprecated(library.getIsDeprecated())
                 .hasSecurityVulnerabilities(library.getHasSecurityVulnerabilities())
-
+                .vulnerabilityCount(library.getVulnerabilityCount())
+                .vulnerabilities(library.getVulnerabilities() != null ?
+                        library.getVulnerabilities().stream()
+                                .map(VulnerabilityDTO::fromEntity)
+                                .collect(Collectors.toList()) : null)
 
                 .homepageUrl(library.getHomepageUrl())
                 .repositoryUrl(library.getRepositoryUrl())
@@ -129,35 +146,45 @@ public class LibraryDTO {
                 .packageUrl(library.getPackageUrl())
 
 
-                .keywords(library.getKeywords())
                 .tags(library.getTags())
                 .supportedOs(library.getSupportedOs())
 
-
                 .exampleCodeSnippet(library.getExampleCodeSnippet())
-
+                .useCase(library.getUseCase())
 
                 .dependencyNames(depNames)
                 .dependencyCount(depCount)
 
 
-                .popularityScore(library.getPopularityScore())
-                .qualityGrade(library.getQualityGrade())
-                .activelyMaintained(library.isActivelyMaintained())
+                // Comparison scores from unified ComparisonService (if available)
+                .popularityScore(comparison != null ? comparison.getPopularityScore() : null)
+                .maintenanceScore(comparison != null ? comparison.getMaintenanceScore() : null)
+                .securityScore(comparison != null ? comparison.getSecurityScore() : null)
+                .communityScore(comparison != null ? comparison.getCommunityScore() : null)
+                .qualityScore(comparison != null ? comparison.getQualityScore() : null)
+                .overallScore(comparison != null ? comparison.getOverallScore() : null)
+                .qualityGrade(comparison != null ? comparison.getQualityGrade() : library.getQualityGrade())
+                .activelyMaintained(comparison != null ? comparison.isActivelyMaintained() : library.isActivelyMaintained())
+                .vulnerabilitySeverityScore(comparison != null ? comparison.getVulnerabilitySeverityScore() : null)
                 .popularityDisplay(formatPopularity(library.getGithubStars()))
-                .downloadsDisplay(formatDownloads(library.getDownloadsLast30Days()))
 
                 .build();
     }
 
     // List<LibraryDTO> - > DTO
+    // Overloaded method for backward compatibility
     public static List<LibraryDTO> fromEntities(List<Library> libraries) {
+        return fromEntities(libraries, null);
+    }
+    
+    // Main method with ComparisonService
+    public static List<LibraryDTO> fromEntities(List<Library> libraries, ComparisonService comparisonService) {
         if (libraries == null) {
             return null;
         }
 
         return libraries.stream()
-                .map(LibraryDTO::fromEntity)
+                .map(lib -> LibraryDTO.fromEntity(lib, comparisonService))
                 .collect(Collectors.toList());
     }
 
@@ -177,20 +204,4 @@ public class LibraryDTO {
         }
     }
 
-    // display formatter donwloads
-    private static String formatDownloads(Long downloads) {
-        if (downloads == null) {
-            return null;
-        }
-
-        if (downloads >= 1_000_000_000) {
-            return String.format("%.1fB/month", downloads / 1_000_000_000.0);
-        } else if (downloads >= 1_000_000) {
-            return String.format("%.1fM/month", downloads / 1_000_000.0);
-        } else if (downloads >= 1_000) {
-            return String.format("%.1fK/month", downloads / 1_000.0);
-        } else {
-            return downloads + "/month";
-        }
-    }
 }

@@ -59,6 +59,9 @@ public class SecurityConfig {
                         .requestMatchers("/api/libraries/advanced-search").permitAll()
 
                         // Admin endpoints - require authentication
+                        // NOTE: Admin data load endpoint is public for testing purposes (localhost only)
+                        // Remove this line in production or add proper authentication
+                        .requestMatchers("/api/admin/data/load**").permitAll()
                         .requestMatchers("/api/admin/**").authenticated()
 
                         // All other endpoints - require authentication

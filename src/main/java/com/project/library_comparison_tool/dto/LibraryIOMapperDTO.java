@@ -4,6 +4,15 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.project.library_comparison_tool.entity.Library;
 import com.project.library_comparison_tool.entity.LibraryDependency;
 import com.project.library_comparison_tool.service.CategoryService;
+import com.project.library_comparison_tool.service.FrameworkService;
+import com.project.library_comparison_tool.service.RuntimeEnvironmentService;
+import com.project.library_comparison_tool.service.OperatingSystemService;
+import com.project.library_comparison_tool.service.UseCaseService;
+import com.project.library_comparison_tool.service.LicenseService;
+import com.project.library_comparison_tool.service.DeprecationService;
+import com.project.library_comparison_tool.service.SecurityVulnerabilityService;
+import com.project.library_comparison_tool.service.DocumentationService;
+import com.project.library_comparison_tool.service.ExampleCodeService;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
@@ -17,9 +26,37 @@ import java.util.stream.Collectors;
 public class LibraryIOMapperDTO {
 
     private final CategoryService categoryService;
+    private final FrameworkService frameworkService;
+    private final RuntimeEnvironmentService runtimeEnvironmentService;
+    private final OperatingSystemService operatingSystemService;
+    private final UseCaseService useCaseService;
+    private final LicenseService licenseService;
+    private final DeprecationService deprecationService;
+    private final SecurityVulnerabilityService securityVulnerabilityService;
+    private final DocumentationService documentationService;
+    private final ExampleCodeService exampleCodeService;
 
-    public LibraryIOMapperDTO(CategoryService categoryService) {
+    public LibraryIOMapperDTO(
+            CategoryService categoryService,
+            FrameworkService frameworkService,
+            RuntimeEnvironmentService runtimeEnvironmentService,
+            OperatingSystemService operatingSystemService,
+            UseCaseService useCaseService,
+            LicenseService licenseService,
+            DeprecationService deprecationService,
+            SecurityVulnerabilityService securityVulnerabilityService,
+            DocumentationService documentationService,
+            ExampleCodeService exampleCodeService) {
         this.categoryService = categoryService;
+        this.frameworkService = frameworkService;
+        this.runtimeEnvironmentService = runtimeEnvironmentService;
+        this.operatingSystemService = operatingSystemService;
+        this.useCaseService = useCaseService;
+        this.licenseService = licenseService;
+        this.deprecationService = deprecationService;
+        this.securityVulnerabilityService = securityVulnerabilityService;
+        this.documentationService = documentationService;
+        this.exampleCodeService = exampleCodeService;
     }
 
     //Convert libraries.io API response to Library entity
@@ -39,10 +76,10 @@ public class LibraryIOMapperDTO {
 
         library.setLatestVersion(getTextOrNull(apiResponse, "latest_stable_release_number"));
 
-        // Parse last updated date
+        // Parse last registry release date (from package registry)
         String publishedAt = getTextOrNull(apiResponse, "latest_stable_release_published_at");
         if (publishedAt != null) {
-            library.setLastUpdated(publishedAt.substring(0, 10));
+            library.setLastRegistryReleaseDate(publishedAt.substring(0, 10));
         }
 
         // URLs
@@ -61,36 +98,46 @@ public class LibraryIOMapperDTO {
             library.setLicenseType(licenses.get(0).asText());
         }
 
-        // Cost model (based on license)
+        // Cost model (based on license) - using LicenseService
         String license = library.getLicenseType();
-        if (license != null && isOpenSourceLicense(license)) {
-            library.setCost("Free / Open Source");
-        } else if (license == null) {
-            library.setCost("Unknown");
-        } else {
-            library.setCost("Check License");
-        }
+        library.setCost(licenseService.determineCost(license));
 
         // Status flags
-        library.setIsDeprecated(false);
+        // Check deprecation status using DeprecationService
+        List<String> keywords = extractKeywordsFromJson(apiResponse);
+        boolean isDeprecated = deprecationService.checkDeprecation(
+                library.getPackageManager(),
+                library.getName(),
+                library.getDescription(),
+                keywords
+        );
+        library.setIsDeprecated(isDeprecated);
+        
+        // Security vulnerabilities will be checked during enrichment
+        // Set default values for now
         library.setHasSecurityVulnerabilities(false);
+        library.setVulnerabilityCount(0);
 
-        // Determine framework based on language and name
-        library.setFramework(inferFramework(library.getName(), library.getLanguage()));
+        // Determine framework based on language and name - using FrameworkService
+        String inferredFramework = frameworkService.inferFramework(library.getName(), library.getLanguage());
+        library.setFramework(inferredFramework);
 
-        // Runtime environment based on language
-        library.setRuntimeEnvironment(inferRuntimeEnvironment(library.getLanguage()));
+        // Runtime environment based on language and framework - using RuntimeEnvironmentService
+        library.setRuntimeEnvironment(runtimeEnvironmentService.inferRuntimeEnvironment(
+                library.getLanguage(), 
+                inferredFramework
+        ));
 
-        // Infer supported operating systems
-        library.setSupportedOs(inferSupportedOs(
+        // Infer supported operating systems - using OperatingSystemService
+        library.setSupportedOs(operatingSystemService.inferSupportedOs(
                 library.getLanguage(),
                 library.getPackageManager(),
                 library.getName()
         ));
 
 
-        //Infer categories using CategoryService
-        List<String> keywords = extractKeywordsFromJson(apiResponse);
+        //Infer categories using CategoryService (multi-category support)
+        // Note: keywords already extracted above for deprecation check
         Set<CategoryService.Category> inferredCategories = categoryService.inferCategories(
                 library.getName(),
                 library.getDescription(),
@@ -99,18 +146,19 @@ public class LibraryIOMapperDTO {
                 library.getPackageManager()
         );
 
-        // Set primary category
-        CategoryService.Category primaryCategory = categoryService.getPrimaryCategory(inferredCategories);
-        library.setCategory(primaryCategory.getDisplayName());
-
-        // Set all categories as comma-separated string
+        // Set all categories as comma-separated string (no single primary category)
         String allCategories = inferredCategories.stream()
                 .map(CategoryService.Category::getDisplayName)
                 .sorted()
                 .collect(Collectors.joining(", "));
         library.setCategories(allCategories);
 
+        // Generate use case description (plain English for non-technical users) - using UseCaseService
+        String useCase = useCaseService.generateUseCase(library.getName(), library.getDescription(), allCategories, library.getLanguage());
+        library.setUseCase(useCase);
+
         System.out.println("    → Categories: " + allCategories);
+        System.out.println("    → Use Case: " + useCase);
 
         return library;
     }
@@ -152,51 +200,6 @@ public class LibraryIOMapperDTO {
         return null;
     }
 
-    private boolean isOpenSourceLicense(String license) {
-        String lower = license.toLowerCase();
-        return lower.contains("apache") ||
-                lower.contains("mit") ||
-                lower.contains("bsd") ||
-                lower.contains("gpl") ||
-                lower.contains("lgpl") ||
-                lower.contains("mpl");
-    }
-
-    private String inferFramework(String name, String language) {
-        if (name == null) return "none";
-
-        String lower = name.toLowerCase();
-
-        // Java frameworks
-        if (lower.contains("spring")) return "spring";
-
-        // JavaScript frameworks
-        if (lower.contains("react")) return "react";
-        if (lower.contains("vue")) return "vue";
-        if (lower.contains("angular")) return "angular";
-        if (lower.contains("express")) return "express";
-
-        // Python frameworks
-        if (lower.contains("django")) return "django";
-        if (lower.contains("flask")) return "flask";
-
-        return "none";
-    }
-
-    private String inferRuntimeEnvironment(String language) {
-        if (language == null) return "unknown";
-
-        String lower = language.toLowerCase();
-
-        if (lower.contains("java")) return "jvm";
-        if (lower.contains("javascript") || lower.contains("typescript")) return "browser";
-        if (lower.contains("python")) return "python";
-        if (lower.contains("c++") || lower.contains("c") || lower.contains("rust")) return "native";
-        if (lower.contains("go")) return "native";
-        if (lower.contains("c#") || lower.contains("f#")) return "dotnet";
-
-        return "unknown";
-    }
 
     /**
      * Extract keywords from libraries.io JSON response
@@ -232,15 +235,15 @@ public class LibraryIOMapperDTO {
             System.out.println("    → Set dependents: " + dependents);
         }
 
-        // Get last commit/release date for maintenance check
+        // Get last repository release date (from GitHub/GitLab) for maintenance check
         String latestReleasePublished = getTextOrNull(detailedResponse, "latest_release_published_at");
         if (latestReleasePublished != null && latestReleasePublished.length() >= 10) {
             try {
                 LocalDate releaseDate = LocalDate.parse(latestReleasePublished.substring(0, 10));
-                library.setLastCommitDate(releaseDate);
-                System.out.println("    → Set commit date: " + releaseDate);
+                library.setLastRepositoryReleaseDate(releaseDate);
+                System.out.println("    → Set repository release date: " + releaseDate);
             } catch (Exception e) {
-                System.err.println("    ✗ Error parsing commit date: " + e.getMessage());
+                System.err.println("    ✗ Error parsing repository release date: " + e.getMessage());
             }
         }
 
@@ -256,6 +259,14 @@ public class LibraryIOMapperDTO {
             library.setRepositoryUrl(repoUrl);
         }
 
+        // Infer documentation URL using DocumentationService
+        String apiDocumentationUrl = getTextOrNull(detailedResponse, "documentation_url");
+        String documentationUrl = documentationService.inferDocumentationUrl(library, apiDocumentationUrl);
+        if (documentationUrl != null && !documentationUrl.isEmpty()) {
+            library.setDocumentationUrl(documentationUrl);
+            System.out.println("    → Set documentation URL: " + documentationUrl);
+        }
+
         // Get sourcerank (libraries.io quality score)
         Integer sourcerank = getIntOrNull(detailedResponse, "rank");
         if (sourcerank != null) {
@@ -263,7 +274,7 @@ public class LibraryIOMapperDTO {
             System.out.println("    → Sourcerank: " + sourcerank);
         }
 
-        // Re-infer categories with detailed information
+        // Re-infer categories with detailed information (multi-category support)
         List<String> keywords = extractKeywordsFromJson(detailedResponse);
         Set<CategoryService.Category> inferredCategories = categoryService.inferCategories(
                 library.getName(),
@@ -273,88 +284,69 @@ public class LibraryIOMapperDTO {
                 library.getPackageManager()
         );
 
-        // Update primary category
-        CategoryService.Category primaryCategory = categoryService.getPrimaryCategory(inferredCategories);
-        library.setCategory(primaryCategory.getDisplayName());
-
-        // Update all categories
+        // Update all categories (comma-separated)
         String allCategories = inferredCategories.stream()
                 .map(CategoryService.Category::getDisplayName)
                 .sorted()
                 .collect(Collectors.joining(", "));
         library.setCategories(allCategories);
 
-        // Re-infer OS (in case we have more info now)
-        library.setSupportedOs(inferSupportedOs(
+        // Extract example code snippet from GitHub
+        String exampleCode = exampleCodeService.extractExampleCode(library);
+        if (exampleCode != null && !exampleCode.isEmpty()) {
+            library.setExampleCodeSnippet(exampleCode);
+        }
+
+        // Extract usage description from README to enhance useCase
+        String usageFromReadme = exampleCodeService.extractUsageDescription(library);
+        
+        // Update use case - prefer README usage, fallback to generated useCase
+        if (usageFromReadme != null && !usageFromReadme.isEmpty()) {
+            library.setUseCase(usageFromReadme);
+            System.out.println("    → Enhanced use case from README.md");
+        } else if (library.getUseCase() == null || library.getUseCase().isEmpty()) {
+            String useCase = useCaseService.generateUseCase(library.getName(), library.getDescription(), allCategories, library.getLanguage());
+            library.setUseCase(useCase);
+        }
+
+        // Re-infer OS (in case we have more info now) - using OperatingSystemService
+        library.setSupportedOs(operatingSystemService.inferSupportedOs(
                 library.getLanguage(),
                 library.getPackageManager(),
                 library.getName()
         ));
 
+        // Re-check deprecation status with detailed information (may have more accurate data)
+        // Only update if we haven't already detected deprecation (to avoid unnecessary API calls)
+        if (!Boolean.TRUE.equals(library.getIsDeprecated())) {
+            List<String> detailedKeywords = extractKeywordsFromJson(detailedResponse);
+            boolean isDeprecated = deprecationService.checkDeprecation(
+                    library.getPackageManager(),
+                    library.getName(),
+                    library.getDescription(),
+                    detailedKeywords
+            );
+            if (isDeprecated) {
+                library.setIsDeprecated(true);
+                System.out.println("    → Deprecation detected during enrichment");
+            }
+        }
+
+        // Check security vulnerabilities using SecurityVulnerabilityService
+        // This will set hasSecurityVulnerabilities, vulnerabilityCount, and populate vulnerabilities list
+        List<com.project.library_comparison_tool.entity.Vulnerability> vulnerabilities = 
+                securityVulnerabilityService.checkAndStoreVulnerabilities(library);
+        
+        // Add vulnerabilities to library (they're already linked in the service)
+        if (vulnerabilities != null && !vulnerabilities.isEmpty()) {
+            library.getVulnerabilities().clear();
+            library.getVulnerabilities().addAll(vulnerabilities);
+            library.setVulnerabilityCount(vulnerabilities.size());
+            library.setHasSecurityVulnerabilities(true);
+            System.out.println("    → Security vulnerabilities detected: " + vulnerabilities.size());
+        }
+
         return library;
     }
 
-    /**
-     * Infer supported operating systems based on platform and language
-     * @param language Programming language
-     * @param platform Package manager
-     * @param name Library name
-     * @return List of supported OS
-     */
-    private List<String> inferSupportedOs(String language, String platform, String name) {
-        if (language == null && platform == null) {
-            return List.of("Unknown");
-        }
-
-        String lowerName = name != null ? name.toLowerCase() : "";
-
-        // Browser-based (platform-agnostic)
-        if (language != null && language.equalsIgnoreCase("JavaScript")) {
-            if (lowerName.contains("react") || lowerName.contains("vue") ||
-                    lowerName.contains("angular") || lowerName.contains("svelte")) {
-                return List.of("Browser (all OS)");
-            }
-        }
-
-        // Platform-based inference
-        if (platform != null) {
-            switch (platform.toUpperCase()) {
-                case "NPM":
-                    return List.of("Linux", "macOS", "Windows");
-                case "MAVEN":
-                case "GRADLE":
-                    return List.of("Linux", "macOS", "Windows", "Any OS with JVM");
-                case "PYPI":
-                    return List.of("Linux", "macOS", "Windows");
-                case "NUGET":
-                    return List.of("Windows", "Linux", "macOS");
-                case "GO":
-                    return List.of("Linux", "macOS", "Windows", "BSD");
-                case "CARGO":
-                    return List.of("Linux", "macOS", "Windows");
-                case "RUBYGEMS":
-                    return List.of("Linux", "macOS", "Windows");
-                case "COCOAPODS":
-                case "SWIFTPM":
-                    return List.of("macOS", "iOS");
-                case "PACKAGIST": // PHP
-                    return List.of("Linux", "macOS", "Windows");
-                case "HEX": // Elixir
-                    return List.of("Linux", "macOS", "Windows");
-                case "CRATES": // Rust (alternative name)
-                    return List.of("Linux", "macOS", "Windows");
-            }
-        }
-
-        // Language-based fallback
-        if (language != null) {
-            if (language.equalsIgnoreCase("Java") ||
-                    language.equalsIgnoreCase("Kotlin") ||
-                    language.equalsIgnoreCase("Scala")) {
-                return List.of("Linux", "macOS", "Windows", "Any OS with JVM");
-            }
-        }
-
-        return List.of("Platform-dependent");
-    }
 }
