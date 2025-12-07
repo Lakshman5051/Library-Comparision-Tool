@@ -91,6 +91,25 @@
 			<artifactId>sendgrid-java</artifactId>
 			<version>4.9.2</version>
 		</dependency>
+
+		<!-- Spring Mail for SMTP support (Gmail, Outlook, etc.) -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-mail</artifactId>
+		</dependency>
+
+		<!-- AWS SDK for SES (Simple Email Service) -->
+		<dependency>
+			<groupId>software.amazon.awssdk</groupId>
+			<artifactId>ses</artifactId>
+			<version>2.20.26</version>
+		</dependency>
+
+		<!-- WebClient for HTTP requests (Resend API) -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-webflux</artifactId>
+		</dependency>
 	</dependencies>
 
 	<build>
