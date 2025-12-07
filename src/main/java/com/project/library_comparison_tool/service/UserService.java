@@ -78,10 +78,8 @@ public class UserService {
                 .profilePictureUrl(googleInfo.getProfilePictureUrl())
                 .emailVerified(googleInfo.getEmailVerified())
                 .isActive(true)
+                .role(Role.USER) // Default role
                 .build();
-
-        // Assign default USER role
-        user.addRole(Role.USER);
 
         // Update login timestamp
         user.updateLastLogin();
@@ -179,10 +177,8 @@ public class UserService {
                 .lastName(signupRequest.getLastName())
                 .emailVerified(false)  // Email not verified yet
                 .isActive(true)
+                .role(Role.USER) // Default role
                 .build();
-
-        // Assign default USER role
-        user.addRole(Role.USER);
 
         // Update login timestamp
         user.updateLastLogin();
