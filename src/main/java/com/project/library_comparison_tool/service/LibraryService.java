@@ -18,9 +18,11 @@ import java.util.UUID;
 public class LibraryService {
 
     private final LibraryRepository libraryRepository;
+    private final ComparisonService comparisonService;
 
-    public LibraryService(LibraryRepository libraryRepository) {
+    public LibraryService(LibraryRepository libraryRepository, ComparisonService comparisonService) {
         this.libraryRepository = libraryRepository;
+        this.comparisonService = comparisonService;
     }
 
     //If we already have a given library (same name), update it. Otherwise insert it
@@ -32,17 +34,18 @@ public class LibraryService {
             Library existing = existingOpt.get();
 
             // Update mutable fields
-            existing.setCategory(library.getCategory());
+            existing.setCategories(library.getCategories());
             existing.setDescription(library.getDescription());
             existing.setFramework(library.getFramework());
             existing.setRuntimeEnvironment(library.getRuntimeEnvironment());
-            existing.setSupplier(library.getSupplier());
             existing.setLicenseType(library.getLicenseType());
             existing.setCost(library.getCost());
             existing.setLatestVersion(library.getLatestVersion());
-            existing.setLastUpdated(library.getLastUpdated());
+            existing.setLastRegistryReleaseDate(library.getLastRegistryReleaseDate());
+            existing.setLastRepositoryReleaseDate(library.getLastRepositoryReleaseDate());
             existing.setSupportedOs(library.getSupportedOs());
             existing.setExampleCodeSnippet(library.getExampleCodeSnippet());
+            existing.setUseCase(library.getUseCase());
             // NOTE: you could also merge dependencies here if you want
 
             return libraryRepository.save(existing);
@@ -74,9 +77,9 @@ public class LibraryService {
         return libraryRepository.findByNameContainingIgnoreCase(namePart);
     }
 
-    // Filter by category (e.g. "logging", "json", "ui-components")
+    // Filter by category (searches in categories comma-separated string)
     public List<Library> getLibrariesByCategory(String category) {
-        return libraryRepository.findByCategoryIgnoreCase(category);
+        return libraryRepository.findByCategoriesContainingIgnoreCase(category);
     }
 
     //most popular libraries
@@ -94,7 +97,10 @@ public class LibraryService {
         // Filter by quality grades (done in-memory since it's a calculated field)
         if (criteria.getIncludeGrades() != null && !criteria.getIncludeGrades().isEmpty()) {
             libraries = libraries.stream()
-                    .filter(lib -> criteria.getIncludeGrades().contains(lib.getQualityGrade()))
+                    .filter(lib -> {
+                        ComparisonService.ComparisonResult result = comparisonService.calculateComparison(lib);
+                        return criteria.getIncludeGrades().contains(result.getQualityGrade());
+                    })
                     .collect(Collectors.toList());
         }
 
@@ -113,13 +119,13 @@ public class LibraryService {
                     libraries.sort(Comparator.comparing(Library::getName));
                     break;
                 case "updated":
-                    libraries.sort(Comparator.comparing(Library::getLastCommitDate,
+                    libraries.sort(Comparator.comparing(Library::getLastRepositoryReleaseDate,
                             Comparator.nullsLast(Comparator.reverseOrder())));
                     break;
             }
         }
 
         // Convert to DTOs
-        return LibraryDTO.fromEntities(libraries);
+        return LibraryDTO.fromEntities(libraries, comparisonService);
     }
 }

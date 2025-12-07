@@ -12,8 +12,8 @@ public interface LibraryRepository extends JpaRepository<Library, Long> {
     // simple partial / case-insensitive match
     List<Library> findByNameContainingIgnoreCase(String name);
 
-    // search by category filter
-    List<Library> findByCategoryIgnoreCase(String category);
+    // search by category filter (searches in comma-separated categories string)
+    List<Library> findByCategoriesContainingIgnoreCase(String category);
 
     //duplicate prevention
     Optional<Library> findByNameIgnoreCase(String name);

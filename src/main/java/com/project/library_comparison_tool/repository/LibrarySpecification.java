@@ -25,15 +25,16 @@ public class LibrarySpecification {
                 predicates.add(criteriaBuilder.or(namePredicate, descPredicate));
             }
 
-            // 2. MULTIPLE CATEGORIES (OR logic)
+            // 2. MULTIPLE CATEGORIES (OR logic) - searches in comma-separated categories string
             if (criteria.getCategories() != null && !criteria.getCategories().isEmpty()) {
                 List<Predicate> categoryPredicates = new ArrayList<>();
                 for (String category : criteria.getCategories()) {
-                    // Check primary category
-                    Predicate primaryCategory = criteriaBuilder.equal(root.get("category"), category);
-                    // Check categories field (comma-separated)
-                    Predicate multiCategory = criteriaBuilder.like(root.get("categories"), "%" + category + "%");
-                    categoryPredicates.add(criteriaBuilder.or(primaryCategory, multiCategory));
+                    // Check categories field (comma-separated string)
+                    Predicate categoryMatch = criteriaBuilder.like(
+                            criteriaBuilder.lower(root.get("categories")), 
+                            "%" + category.toLowerCase() + "%"
+                    );
+                    categoryPredicates.add(categoryMatch);
                 }
                 predicates.add(criteriaBuilder.or(categoryPredicates.toArray(new Predicate[0])));
             }
@@ -67,10 +68,10 @@ public class LibrarySpecification {
                 ));
             }
 
-            // 6. LAST COMMIT DATE (e.g., within last 3 months)
+            // 6. LAST REPOSITORY RELEASE DATE (e.g., within last 3 months)
             if (criteria.getLastCommitAfter() != null) {
                 predicates.add(criteriaBuilder.greaterThanOrEqualTo(
-                        root.get("lastCommitDate"), criteria.getLastCommitAfter()
+                        root.get("lastRepositoryReleaseDate"), criteria.getLastCommitAfter()
                 ));
             }
 
@@ -95,11 +96,11 @@ public class LibrarySpecification {
                 ));
             }
 
-            // 10. EXCLUDE UNMAINTAINED (no commits in last 6 months)
+            // 10. EXCLUDE UNMAINTAINED (no repository releases in last 6 months)
             if (criteria.getExcludeUnmaintained() != null && criteria.getExcludeUnmaintained()) {
                 java.time.LocalDate sixMonthsAgo = java.time.LocalDate.now().minusMonths(6);
                 predicates.add(criteriaBuilder.greaterThan(
-                        root.get("lastCommitDate"), sixMonthsAgo
+                        root.get("lastRepositoryReleaseDate"), sixMonthsAgo
                 ));
             }
 
@@ -113,9 +114,9 @@ public class LibrarySpecification {
             // 12. EXCLUDE CATEGORIES
             if (criteria.getExcludeCategories() != null && !criteria.getExcludeCategories().isEmpty()) {
                 for (String excludeCategory : criteria.getExcludeCategories()) {
-                    predicates.add(criteriaBuilder.and(
-                            criteriaBuilder.notEqual(root.get("category"), excludeCategory),
-                            criteriaBuilder.notLike(root.get("categories"), "%" + excludeCategory + "%")
+                    predicates.add(criteriaBuilder.notLike(
+                            criteriaBuilder.lower(root.get("categories")), 
+                            "%" + excludeCategory.toLowerCase() + "%"
                     ));
                 }
             }
