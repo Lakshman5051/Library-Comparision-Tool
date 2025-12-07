@@ -473,8 +473,8 @@ public class AuthController {
             session.setAttribute("userEmail", user.getEmail());
             session.setAttribute("authProvider", user.getAuthProvider().toString());
             // Store user role for Spring Security
-            String primaryRole = user.hasRole(com.project.library_comparison_tool.entity.Role.ADMIN) ? "ADMIN" : "USER";
-            session.setAttribute("userRole", primaryRole);
+            String userRole = user.getRole().toString().replace("ROLE_", "");
+            session.setAttribute("userRole", userRole);
 
             // Build response using AuthService
             AuthResponse response = authService.getCurrentUser(session);
