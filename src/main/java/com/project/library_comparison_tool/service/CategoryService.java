@@ -7,16 +7,7 @@ import org.springframework.stereotype.Service;
 import java.util.*;
 import java.util.stream.Collectors;
 
-/**
- * Smart category inference service
- *
- * Design Principles:
- * 1. Categories represent USER INTENT (what they need it for)
- * 2. Multi-category support (library can have multiple purposes)
- * 3. Inference based on multiple signals (name, description, keywords, language)
- * 4. Graceful degradation (always returns something, never null)
- * 5. Edge case handling (ambiguous libraries get multiple categories)
- */
+// category service designed to map a library to which category through automation
 @Service
 public class CategoryService {
 
@@ -76,8 +67,21 @@ public class CategoryService {
         }
     }
 
+    // Scoring threshold - categories with score >= this will be included
+    // Lowered from 30 to 20 to reduce false "Other" classifications
+    private static final int SCORE_THRESHOLD = 20;
+    
+    // Score weights for different signal types
+    private static final int NAME_MATCH_WEIGHT = 10;      // Strong signal
+    private static final int DESCRIPTION_WEIGHT = 5;      // Medium signal
+    private static final int KEYWORD_WEIGHT = 3;          // Weak signal
+    private static final int LANGUAGE_BONUS = 2;          // Language-specific bonus
+    
+    // Bonus for name-only matches (when description/keywords are missing)
+    private static final int NAME_ONLY_BONUS = 5;         // Extra boost if only name matches
+
     /**
-     * Infer categories for a library
+     * Infer categories for a library using scoring system
      * Returns a SET because a library can serve multiple purposes
      *
      * @param libraryName Name of the library
@@ -94,90 +98,99 @@ public class CategoryService {
             String language,
             String platform) {
 
-        Set<Category> categories = new HashSet<>();
-
-        // Combine all text signals for analysis
-        String searchText = buildSearchText(libraryName, description, keywords);
-
-        // Check against each category
-        if (isUiFramework(searchText, libraryName)) {
-            categories.add(Category.UI_FRAMEWORK);
+        // Debug: Log input parameters
+        System.out.println("    → Category inference for: '" + libraryName + "'");
+        System.out.println("       Platform: " + platform + ", Language: " + language);
+        if (description != null && !description.isEmpty()) {
+            System.out.println("       Description: " + (description.length() > 60 ? description.substring(0, 60) + "..." : description));
+        }
+        if (keywords != null && !keywords.isEmpty()) {
+            System.out.println("       Keywords: " + String.join(", ", keywords.subList(0, Math.min(5, keywords.size()))));
         }
 
-        if (isWebFramework(searchText, libraryName)) {
-            categories.add(Category.WEB_FRAMEWORK);
+        // Score all categories
+        Map<Category, Integer> categoryScores = scoreAllCategories(
+                libraryName, description, keywords, language, platform
+        );
+
+        // Debug: Log top 3 category scores
+        List<Map.Entry<Category, Integer>> topScores = categoryScores.entrySet().stream()
+                .filter(e -> e.getKey() != Category.OTHER)
+                .sorted((e1, e2) -> Integer.compare(e2.getValue(), e1.getValue()))
+                .limit(3)
+                .collect(Collectors.toList());
+        
+        if (!topScores.isEmpty()) {
+            System.out.println("    → Category scores (top 3):");
+            for (Map.Entry<Category, Integer> entry : topScores) {
+                System.out.println("       - " + entry.getKey().getDisplayName() + ": " + entry.getValue() + 
+                                 (entry.getValue() >= SCORE_THRESHOLD ? " ✓" : " (below threshold " + SCORE_THRESHOLD + ")"));
+            }
         }
 
-        if (isDatabase(searchText, libraryName)) {
-            categories.add(Category.DATABASE);
-        }
+        // Filter categories above threshold
+        Set<Category> categories = categoryScores.entrySet().stream()
+                .filter(entry -> entry.getValue() >= SCORE_THRESHOLD)
+                .map(Map.Entry::getKey)
+                .collect(Collectors.toSet());
 
-        if (isDataProcessing(searchText, libraryName, language)) {
-            categories.add(Category.DATA_PROCESSING);
-        }
-
-        if (isTesting(searchText, libraryName)) {
-            categories.add(Category.TESTING);
-        }
-
-        if (isBuildTool(searchText, libraryName)) {
-            categories.add(Category.BUILD_TOOLS);
-        }
-
-        if (isCodeQuality(searchText, libraryName)) {
-            categories.add(Category.CODE_QUALITY);
-        }
-
-        if (isHttpClient(searchText, libraryName)) {
-            categories.add(Category.HTTP_CLIENT);
-        }
-
-        if (isMessaging(searchText, libraryName)) {
-            categories.add(Category.MESSAGING);
-        }
-
-        if (isMachineLearning(searchText, libraryName)) {
-            categories.add(Category.MACHINE_LEARNING);
-        }
-
-        if (isDataVisualization(searchText, libraryName)) {
-            categories.add(Category.DATA_VISUALIZATION);
-        }
-
-        if (isLogging(searchText, libraryName)) {
-            categories.add(Category.LOGGING);
-        }
-
-        if (isSecurity(searchText, libraryName)) {
-            categories.add(Category.SECURITY);
-        }
-
-        if (isSerialization(searchText, libraryName)) {
-            categories.add(Category.SERIALIZATION);
-        }
-
-        if (isMobile(searchText, libraryName, platform)) {
-            categories.add(Category.MOBILE);
-        }
-
-        if (isGaming(searchText, libraryName)) {
-            categories.add(Category.GAMING);
-        }
-
-        if (isIoT(searchText, libraryName)) {
-            categories.add(Category.IOT);
-        }
-
-        if (isUtilities(searchText, libraryName)) {
-            categories.add(Category.UTILITIES);
-        }
-
-        // Edge Case: No matches - assign OTHER
+        // Edge Case: No matches above threshold - assign OTHER
         if (categories.isEmpty()) {
+            System.out.println("    ⚠ No categories above threshold (" + SCORE_THRESHOLD + "). Assigning 'Other'.");
+            System.out.println("    → Consider: name='" + libraryName + "', description='" + 
+                             (description != null && description.length() > 50 ? description.substring(0, 50) + "..." : description) + "'");
             categories.add(Category.OTHER);
+        } else {
+            System.out.println("    ✓ Assigned categories: " + categories.stream()
+                    .map(Category::getDisplayName)
+                    .collect(Collectors.joining(", ")));
         }
 
         return categories;
+    }
+
+    /**
+     * Score all categories and return a map of category -> score
+     * 
+     * @param libraryName Name of the library
+     * @param description Library description
+     * @param keywords Keywords/tags from libraries.io
+     * @param language Programming language
+     * @param platform Package manager (NPM, Maven, PyPI)
+     * @return Map of category to score (0-100+)
+     */
+    private Map<Category, Integer> scoreAllCategories(
+            String libraryName,
+            String description,
+            List<String> keywords,
+            String language,
+            String platform) {
+
+        Map<Category, Integer> scores = new HashMap<>();
+        String searchText = buildSearchText(libraryName, description, keywords);
+
+        // Score each category
+        scores.put(Category.UI_FRAMEWORK, scoreUiFramework(libraryName, description, keywords, language, searchText));
+        scores.put(Category.WEB_FRAMEWORK, scoreWebFramework(libraryName, description, keywords, language, searchText));
+        scores.put(Category.DATABASE, scoreDatabase(libraryName, description, keywords, language, searchText));
+        scores.put(Category.DATA_PROCESSING, scoreDataProcessing(libraryName, description, keywords, language, searchText));
+        scores.put(Category.TESTING, scoreTesting(libraryName, description, keywords, language, searchText));
+        scores.put(Category.BUILD_TOOLS, scoreBuildTool(libraryName, description, keywords, language, searchText));
+        scores.put(Category.CODE_QUALITY, scoreCodeQuality(libraryName, description, keywords, language, searchText));
+        scores.put(Category.HTTP_CLIENT, scoreHttpClient(libraryName, description, keywords, language, searchText));
+        scores.put(Category.MESSAGING, scoreMessaging(libraryName, description, keywords, language, searchText));
+        scores.put(Category.MACHINE_LEARNING, scoreMachineLearning(libraryName, description, keywords, language, searchText));
+        scores.put(Category.DATA_VISUALIZATION, scoreDataVisualization(libraryName, description, keywords, language, searchText));
+        scores.put(Category.LOGGING, scoreLogging(libraryName, description, keywords, language, searchText));
+        scores.put(Category.SECURITY, scoreSecurity(libraryName, description, keywords, language, searchText));
+        scores.put(Category.SERIALIZATION, scoreSerialization(libraryName, description, keywords, language, searchText));
+        scores.put(Category.MOBILE, scoreMobile(libraryName, description, keywords, language, platform, searchText));
+        scores.put(Category.GAMING, scoreGaming(libraryName, description, keywords, language, searchText));
+        scores.put(Category.IOT, scoreIoT(libraryName, description, keywords, language, searchText));
+        scores.put(Category.UTILITIES, scoreUtilities(libraryName, description, keywords, language, searchText));
+        scores.put(Category.OTHER, 0); // OTHER is fallback, no scoring
+
+        return scores;
     }
 
     /**
@@ -222,175 +235,1062 @@ public class CategoryService {
     }
 
     // ============================================
-    // DETECTION METHODS (Pattern Matching)
+    // SCORING METHODS (Replaces boolean detection)
     // ============================================
 
-    private boolean isUiFramework(String text, String name) {
-        return containsAny(text,
+    private int scoreUiFramework(String name, String description, List<String> keywords, String language, String searchText) {
+        int score = 0;
+        
+        // Extract artifact name from Maven coordinates
+        String artifactName = extractArtifactName(name);
+        String nameLower = artifactName.toLowerCase();
+        
+        // Strong signals from library name (weight: 10)
+        if (containsAny(nameLower,
                 "react", "vue", "angular", "svelte", "preact", "solid",
-                "ui framework", "user interface", "component library",
-                "frontend framework", "view library", "reactive ui"
-        ) && !containsAny(text, "backend", "server", "api");
+                "ember", "backbone", "knockout", "mithril", "alpine",
+                "lit", "stencil", "riot", "inferno", "hyperapp"
+        )) {
+            score += NAME_MATCH_WEIGHT;
+        }
+        
+        // Medium signals from description (weight: 5)
+        if (description != null) {
+            String descLower = description.toLowerCase();
+            if (containsAny(descLower,
+                    "ui framework", "user interface", "component library",
+                    "frontend framework", "view library", "reactive ui"
+            )) {
+                score += DESCRIPTION_WEIGHT;
+            }
+            if (containsAny(descLower,
+                    "virtual dom", "jsx", "template engine", "declarative",
+                    "component-based", "spa", "single page application"
+            )) {
+                score += DESCRIPTION_WEIGHT;
+            }
+            // Negative context reduces score
+            if (containsAny(descLower, "backend", "server-side", "ssr framework")) {
+                score -= DESCRIPTION_WEIGHT;
+            }
+        }
+        
+        // Weak signals from keywords (weight: 3 each, max 2 matches)
+        int keywordMatches = 0;
+        if (keywords != null) {
+            for (String keyword : keywords) {
+                if (containsAny(keyword.toLowerCase(),
+                        "ui", "component", "frontend", "react", "vue", "angular"
+                )) {
+                    keywordMatches++;
+                    if (keywordMatches <= 2) {
+                        score += KEYWORD_WEIGHT;
+                    }
+                }
+            }
+        }
+        
+        // Language bonus (JavaScript/TypeScript = bonus)
+        if (("JavaScript".equalsIgnoreCase(language) || "TypeScript".equalsIgnoreCase(language)) && score > 0) {
+            score += LANGUAGE_BONUS;
+        }
+        
+        // Bonus if name matched but description/keywords are missing (common case)
+        boolean hasNameMatch = score >= NAME_MATCH_WEIGHT;
+        boolean missingMetadata = (description == null || description.trim().isEmpty()) && 
+                                  (keywords == null || keywords.isEmpty());
+        if (hasNameMatch && missingMetadata) {
+            score += NAME_ONLY_BONUS;
+        }
+        
+        return Math.max(0, score); // Don't go negative
+    }
+
+        // Legacy boolean method (for backward compatibility if needed)
+    private boolean isUiFramework(String text, String name) {
+        return scoreUiFramework(name, null, null, null, text) >= SCORE_THRESHOLD;
+    }
+
+    private int scoreWebFramework(String name, String description, List<String> keywords, String language, String searchText) {
+        int score = 0;
+        
+        // Extract artifact name from Maven coordinates (e.g., "org.springframework.boot:spring-boot" -> "spring-boot")
+        String artifactName = extractArtifactName(name);
+        String nameLower = (artifactName != null) ? artifactName.toLowerCase() : "";
+        String originalNameLower = (name != null) ? name.toLowerCase() : "";
+        
+        // Strong signals from library name (weight: 10)
+        // Check both extracted name and original name (for cases where extraction might miss something)
+        String[] patterns = {
+            "express", "koa", "fastify", "hapi", "nestjs", "next.js",
+            "spring", "spring-boot", "springboot", "springframework", "django", "flask", "fastapi", "rails", "tornado",
+            "gin", "echo", "fiber", "rocket", "actix", "axum",
+            "phoenix", "play", "vert.x", "micronaut", "quarkus",
+            "asp.net", "laravel", "symfony", "codeigniter"
+        };
+        
+        if (containsAny(nameLower, patterns) || containsAny(originalNameLower, patterns)) {
+            score += NAME_MATCH_WEIGHT;
+        }
+        
+        // Medium signals from description (weight: 5)
+        if (description != null) {
+            String descLower = description.toLowerCase();
+            if (containsAny(descLower,
+                    "web framework", "http server", "web server",
+                    "rest api", "web application", "microservice"
+            )) {
+                score += DESCRIPTION_WEIGHT;
+            }
+            if (containsAny(descLower,
+                    "api framework", "backend framework", "server framework",
+                    "mvc framework", "routing", "middleware"
+            )) {
+                score += DESCRIPTION_WEIGHT;
+            }
+        }
+        
+        // Weak signals from keywords (weight: 3 each, max 2)
+        int keywordMatches = 0;
+        if (keywords != null) {
+            for (String keyword : keywords) {
+                if (containsAny(keyword.toLowerCase(),
+                        "web", "http", "server", "api", "framework", "backend"
+                )) {
+                    keywordMatches++;
+                    if (keywordMatches <= 2) {
+                        score += KEYWORD_WEIGHT;
+                    }
+                }
+            }
+        }
+        
+        // Bonus if name matched but description/keywords are missing
+        boolean hasNameMatch = score >= NAME_MATCH_WEIGHT;
+        boolean missingMetadata = (description == null || description.trim().isEmpty()) && 
+                                  (keywords == null || keywords.isEmpty());
+        if (hasNameMatch && missingMetadata) {
+            score += NAME_ONLY_BONUS;
+        }
+        
+        return Math.max(0, score);
     }
 
     private boolean isWebFramework(String text, String name) {
-        return containsAny(text,
-                "express", "koa", "fastify", "hapi", "nestjs",
-                "spring", "django", "flask", "fastapi", "rails",
-                "gin", "echo", "fiber", "rocket", "actix",
-                "web framework", "http server", "web server",
-                "rest api", "web application", "microservice"
-        );
+        return scoreWebFramework(name, null, null, null, text) >= SCORE_THRESHOLD;
+    }
+
+    private int scoreDatabase(String name, String description, List<String> keywords, String language, String searchText) {
+        int score = 0;
+        
+        // Strong signals from library name (weight: 10)
+        if (containsAny(name.toLowerCase(),
+                "hibernate", "sequelize", "typeorm", "prisma", "drizzle",
+                "sqlalchemy", "mongoose", "gorm", "diesel", "sqlx",
+                "doctrine", "jooq", "mybatis", "knex", "bookshelf",
+                "waterline", "objection", "mikro-orm"
+        )) {
+            score += NAME_MATCH_WEIGHT;
+        }
+        
+        // Medium signals from description (weight: 5)
+        if (description != null) {
+            String descLower = description.toLowerCase();
+            if (containsAny(descLower,
+                    "database", "orm", "object-relational mapping", "query builder"
+            )) {
+                score += DESCRIPTION_WEIGHT;
+            }
+            if (containsAny(descLower,
+                    "database driver", "database client", "data access",
+                    "entity framework", "active record", "repository pattern"
+            )) {
+                score += DESCRIPTION_WEIGHT;
+            }
+        }
+        
+        // Weak signals from keywords (weight: 3 each, max 2)
+        int keywordMatches = 0;
+        if (keywords != null) {
+            for (String keyword : keywords) {
+                if (containsAny(keyword.toLowerCase(),
+                        "database", "orm", "sql", "nosql", "mongodb", "postgres", "mysql"
+                )) {
+                    keywordMatches++;
+                    if (keywordMatches <= 2) {
+                        score += KEYWORD_WEIGHT;
+                    }
+                }
+            }
+        }
+        
+        return Math.max(0, score);
     }
 
     private boolean isDatabase(String text, String name) {
-        return containsAny(text,
-                "hibernate", "sequelize", "typeorm", "prisma",
-                "sqlalchemy", "mongoose", "gorm", "diesel",
-                "database", "orm", "query builder", "sql",
-                "mongodb", "postgres", "mysql", "redis"
-        );
+        return scoreDatabase(name, null, null, null, text) >= SCORE_THRESHOLD;
+    }
+
+    private int scoreDataProcessing(String name, String description, List<String> keywords, String language, String searchText) {
+        int score = 0;
+        
+        // Strong signals from library name (weight: 10)
+        if (containsAny(name.toLowerCase(),
+                "pandas", "numpy", "polars", "dask", "modin", "vaex",
+                "arrow", "pyarrow", "xarray", "ray"
+        )) {
+            score += NAME_MATCH_WEIGHT;
+        }
+        
+        // Medium signals from description (weight: 5)
+        if (description != null) {
+            String descLower = description.toLowerCase();
+            if (containsAny(descLower,
+                    "data analysis", "data processing", "dataframe",
+                    "data manipulation", "etl", "data pipeline"
+            )) {
+                score += DESCRIPTION_WEIGHT;
+            }
+            if (containsAny(descLower,
+                    "data transformation", "data cleaning", "data wrangling",
+                    "tabular data", "structured data", "data aggregation"
+            )) {
+                score += DESCRIPTION_WEIGHT;
+            }
+        }
+        
+        // Weak signals from keywords (weight: 3 each, max 2)
+        int keywordMatches = 0;
+        if (keywords != null) {
+            for (String keyword : keywords) {
+                if (containsAny(keyword.toLowerCase(),
+                        "data", "dataframe", "analysis", "processing", "etl"
+                )) {
+                    keywordMatches++;
+                    if (keywordMatches <= 2) {
+                        score += KEYWORD_WEIGHT;
+                    }
+                }
+            }
+        }
+        
+        // Language-specific bonuses
+        if ("Python".equalsIgnoreCase(language) && 
+            containsAny(searchText, "data", "array", "scientific", "numerical")) {
+            score += LANGUAGE_BONUS;
+        }
+        if ("R".equalsIgnoreCase(language) && 
+            containsAny(searchText, "data", "statistics", "analysis", "dataframe")) {
+            score += LANGUAGE_BONUS;
+        }
+        if ("Java".equalsIgnoreCase(language) && 
+            containsAny(searchText, "data processing", "etl", "data pipeline")) {
+            score += LANGUAGE_BONUS;
+        }
+        
+        return Math.max(0, score);
     }
 
     private boolean isDataProcessing(String text, String name, String language) {
-        boolean hasDataKeywords = containsAny(text,
-                "pandas", "numpy", "polars", "dask",
-                "data analysis", "data processing", "dataframe",
-                "data manipulation", "etl", "data pipeline"
-        );
+        return scoreDataProcessing(name, null, null, language, text) >= SCORE_THRESHOLD;
+    }
 
-        // Python data libraries are very common
-        boolean isPythonDataLib = "Python".equalsIgnoreCase(language) &&
-                containsAny(text, "data", "array", "scientific");
-
-        return hasDataKeywords || isPythonDataLib;
+    private int scoreTesting(String name, String description, List<String> keywords, String language, String searchText) {
+        int score = 0;
+        
+        // Extract artifact name from Maven coordinates
+        String artifactName = extractArtifactName(name);
+        String nameLower = (artifactName != null) ? artifactName.toLowerCase() : "";
+        String originalNameLower = (name != null) ? name.toLowerCase() : "";
+        
+        // Strong signals from library name (weight: 10)
+        String[] patterns = {
+            "jest", "mocha", "vitest", "jasmine", "karma", "ava",
+            "junit", "testng", "mockito", "pytest", "unittest", "nose",
+            "rspec", "minitest", "testify", "ginkgo", "gomega",
+            "xunit", "nunit", "mstest", "qunit", "tap"
+        };
+        
+        if (containsAny(nameLower, patterns) || containsAny(originalNameLower, patterns)) {
+            score += NAME_MATCH_WEIGHT;
+        }
+        
+        // Medium signals from description (weight: 5)
+        if (description != null) {
+            String descLower = description.toLowerCase();
+            if (containsAny(descLower,
+                    "testing", "test framework", "unit test", "test suite",
+                    "integration test", "mock", "mocking", "stub", "spy"
+            )) {
+                score += DESCRIPTION_WEIGHT;
+            }
+            if (containsAny(descLower,
+                    "assertion", "test runner", "test automation",
+                    "bdd", "behavior driven development", "tdd"
+            )) {
+                score += DESCRIPTION_WEIGHT;
+            }
+        }
+        
+        // Weak signals from keywords (weight: 3 each, max 2)
+        int keywordMatches = 0;
+        if (keywords != null) {
+            for (String keyword : keywords) {
+                if (containsAny(keyword.toLowerCase(),
+                        "test", "testing", "mock", "spec", "unit", "integration"
+                )) {
+                    keywordMatches++;
+                    if (keywordMatches <= 2) {
+                        score += KEYWORD_WEIGHT;
+                    }
+                }
+            }
+        }
+        
+        // Bonus if name matched but description/keywords are missing
+        boolean hasNameMatch = score >= NAME_MATCH_WEIGHT;
+        boolean missingMetadata = (description == null || description.trim().isEmpty()) && 
+                                  (keywords == null || keywords.isEmpty());
+        if (hasNameMatch && missingMetadata) {
+            score += NAME_ONLY_BONUS;
+        }
+        
+        return Math.max(0, score);
     }
 
     private boolean isTesting(String text, String name) {
-        return containsAny(text,
-                "jest", "mocha", "vitest", "jasmine", "karma",
-                "junit", "testng", "mockito", "pytest", "unittest",
-                "testing", "test framework", "unit test",
-                "integration test", "mock", "assertion", "test runner"
-        );
+        return scoreTesting(name, null, null, null, text) >= SCORE_THRESHOLD;
+    }
+
+    private int scoreBuildTool(String name, String description, List<String> keywords, String language, String searchText) {
+        int score = 0;
+        
+        // Strong signals from library name (weight: 10)
+        if (containsAny(name.toLowerCase(),
+                "webpack", "vite", "rollup", "parcel", "esbuild", "swc",
+                "maven", "gradle", "gulp", "grunt", "browserify",
+                "snowpack", "turbopack", "rspack", "bazel", "buck",
+                "buck2", "pants", "sbt", "mill", "cargo", "mix"
+        )) {
+            score += NAME_MATCH_WEIGHT;
+        }
+        
+        // Medium signals from description (weight: 5)
+        if (description != null) {
+            String descLower = description.toLowerCase();
+            if (containsAny(descLower,
+                    "build tool", "bundler", "module bundler", "compiler",
+                    "transpiler", "transformer", "task runner", "build system"
+            )) {
+                score += DESCRIPTION_WEIGHT;
+            }
+        }
+        
+        // Weak signals from keywords (weight: 3 each, max 2)
+        int keywordMatches = 0;
+        if (keywords != null) {
+            for (String keyword : keywords) {
+                if (containsAny(keyword.toLowerCase(),
+                        "build", "bundler", "compiler", "transpiler", "task"
+                )) {
+                    keywordMatches++;
+                    if (keywordMatches <= 2) {
+                        score += KEYWORD_WEIGHT;
+                    }
+                }
+            }
+        }
+        
+        return Math.max(0, score);
     }
 
     private boolean isBuildTool(String text, String name) {
-        return containsAny(text,
-                "webpack", "vite", "rollup", "parcel", "esbuild",
-                "maven", "gradle", "gulp", "grunt",
-                "build tool", "bundler", "compiler", "transpiler",
-                "task runner", "build system"
-        );
+        return scoreBuildTool(name, null, null, null, text) >= SCORE_THRESHOLD;
+    }
+
+    private int scoreCodeQuality(String name, String description, List<String> keywords, String language, String searchText) {
+        int score = 0;
+        
+        // Strong signals from library name (weight: 10)
+        if (containsAny(name.toLowerCase(),
+                "eslint", "prettier", "stylelint", "tslint", "biome",
+                "pylint", "black", "checkstyle", "spotbugs", "pmd",
+                "sonarqube", "sonar", "rubocop", "golangci-lint",
+                "clippy", "rustfmt", "gofmt", "ktlint", "dartfmt"
+        )) {
+            score += NAME_MATCH_WEIGHT;
+        }
+        
+        // Medium signals from description (weight: 5)
+        if (description != null) {
+            String descLower = description.toLowerCase();
+            if (containsAny(descLower,
+                    "lint", "linter", "format", "formatter", "code quality",
+                    "static analysis", "code style", "code formatting"
+            )) {
+                score += DESCRIPTION_WEIGHT;
+            }
+        }
+        
+        // Weak signals from keywords (weight: 3 each, max 2)
+        int keywordMatches = 0;
+        if (keywords != null) {
+            for (String keyword : keywords) {
+                if (containsAny(keyword.toLowerCase(),
+                        "lint", "format", "quality", "style", "check"
+                )) {
+                    keywordMatches++;
+                    if (keywordMatches <= 2) {
+                        score += KEYWORD_WEIGHT;
+                    }
+                }
+            }
+        }
+        
+        return Math.max(0, score);
     }
 
     private boolean isCodeQuality(String text, String name) {
-        return containsAny(text,
-                "eslint", "prettier", "stylelint", "tslint",
-                "pylint", "black", "checkstyle", "spotbugs",
-                "lint", "format", "code quality", "static analysis",
-                "code style", "formatter"
-        );
+        return scoreCodeQuality(name, null, null, null, text) >= SCORE_THRESHOLD;
+    }
+
+    private int scoreHttpClient(String name, String description, List<String> keywords, String language, String searchText) {
+        int score = 0;
+        
+        // Extract artifact name from Maven coordinates
+        String artifactName = extractArtifactName(name);
+        String nameLower = (artifactName != null) ? artifactName.toLowerCase() : "";
+        String originalNameLower = (name != null) ? name.toLowerCase() : "";
+        
+        // Strong signals from library name (weight: 10)
+        String[] patterns = {
+            "axios", "got", "superagent", "node-fetch", "ky",
+            "requests", "httpx", "aiohttp", "urllib3", "httpie",
+            "okhttp", "retrofit", "volley", "fuel", "ktor",
+            "reqwest", "ureq", "surf", "isahc", "hyper"
+        };
+        
+        if (containsAny(nameLower, patterns) || containsAny(originalNameLower, patterns)) {
+            score += NAME_MATCH_WEIGHT;
+        }
+        
+        // Medium signals from description (weight: 5)
+        if (description != null) {
+            String descLower = description.toLowerCase();
+            if (containsAny(descLower,
+                    "http client", "rest client", "api client", "http library",
+                    "http request", "ajax", "fetch", "request library"
+            )) {
+                score += DESCRIPTION_WEIGHT;
+            }
+            // Negative context reduces score
+            if (containsAny(descLower, "server", "framework", "web framework")) {
+                score -= DESCRIPTION_WEIGHT;
+            }
+        }
+        
+        // Weak signals from keywords (weight: 3 each, max 2)
+        int keywordMatches = 0;
+        if (keywords != null) {
+            for (String keyword : keywords) {
+                if (containsAny(keyword.toLowerCase(),
+                        "http", "client", "api", "request", "ajax"
+                )) {
+                    keywordMatches++;
+                    if (keywordMatches <= 2) {
+                        score += KEYWORD_WEIGHT;
+                    }
+                }
+            }
+        }
+        
+        // Bonus if name matched but description/keywords are missing
+        boolean hasNameMatch = score >= NAME_MATCH_WEIGHT;
+        boolean missingMetadata = (description == null || description.trim().isEmpty()) && 
+                                  (keywords == null || keywords.isEmpty());
+        if (hasNameMatch && missingMetadata) {
+            score += NAME_ONLY_BONUS;
+        }
+        
+        return Math.max(0, score);
     }
 
     private boolean isHttpClient(String text, String name) {
-        return containsAny(text,
-                "axios", "fetch", "got", "superagent",
-                "requests", "httpx", "aiohttp",
-                "okhttp", "retrofit",
-                "http client", "rest client", "api client",
-                "http request", "ajax"
-        );
+        return scoreHttpClient(name, null, null, null, text) >= SCORE_THRESHOLD;
+    }
+
+    private int scoreMessaging(String name, String description, List<String> keywords, String language, String searchText) {
+        int score = 0;
+        
+        // Strong signals from library name (weight: 10)
+        if (containsAny(name.toLowerCase(),
+                "kafka", "rabbitmq", "redis", "mqtt", "coap",
+                "nats", "zeromq", "activemq", "pulsar"
+        )) {
+            score += NAME_MATCH_WEIGHT;
+        }
+        
+        // Medium signals from description (weight: 5)
+        if (description != null) {
+            String descLower = description.toLowerCase();
+            if (containsAny(descLower,
+                    "message queue", "pub/sub", "event streaming",
+                    "message broker", "event bus"
+            )) {
+                score += DESCRIPTION_WEIGHT;
+            }
+        }
+        
+        // Weak signals from keywords (weight: 3 each, max 2)
+        int keywordMatches = 0;
+        if (keywords != null) {
+            for (String keyword : keywords) {
+                if (containsAny(keyword.toLowerCase(),
+                        "message", "queue", "pub", "sub", "event", "streaming"
+                )) {
+                    keywordMatches++;
+                    if (keywordMatches <= 2) {
+                        score += KEYWORD_WEIGHT;
+                    }
+                }
+            }
+        }
+        
+        return Math.max(0, score);
     }
 
     private boolean isMessaging(String text, String name) {
-        return containsAny(text,
-                "kafka", "rabbitmq", "redis", "mqtt",
-                "message queue", "pub/sub", "event streaming",
-                "message broker", "event bus"
-        );
+        return scoreMessaging(name, null, null, null, text) >= SCORE_THRESHOLD;
+    }
+
+    private int scoreMachineLearning(String name, String description, List<String> keywords, String language, String searchText) {
+        int score = 0;
+        
+        // Strong signals from library name (weight: 10)
+        if (containsAny(name.toLowerCase(),
+                "tensorflow", "pytorch", "keras", "scikit-learn", "sklearn",
+                "xgboost", "lightgbm", "transformers", "huggingface",
+                "jax", "flax", "onnx", "mlx", "caffe", "theano",
+                "mxnet", "chainer", "paddle", "fastai", "spacy"
+        )) {
+            score += NAME_MATCH_WEIGHT;
+        }
+        
+        // Medium signals from description (weight: 5)
+        if (description != null) {
+            String descLower = description.toLowerCase();
+            if (containsAny(descLower,
+                    "machine learning", "ml", "deep learning", "neural network",
+                    "artificial intelligence", "ai", "ai model", "ml framework"
+            )) {
+                score += DESCRIPTION_WEIGHT;
+            }
+            if (containsAny(descLower,
+                    "model training", "inference", "nlp", "natural language processing",
+                    "computer vision", "reinforcement learning"
+            )) {
+                score += DESCRIPTION_WEIGHT;
+            }
+        }
+        
+        // Weak signals from keywords (weight: 3 each, max 2)
+        int keywordMatches = 0;
+        if (keywords != null) {
+            for (String keyword : keywords) {
+                if (containsAny(keyword.toLowerCase(),
+                        "ml", "ai", "machine-learning", "deep-learning", "neural", "nlp"
+                )) {
+                    keywordMatches++;
+                    if (keywordMatches <= 2) {
+                        score += KEYWORD_WEIGHT;
+                    }
+                }
+            }
+        }
+        
+        return Math.max(0, score);
     }
 
     private boolean isMachineLearning(String text, String name) {
-        return containsAny(text,
-                "tensorflow", "pytorch", "keras", "scikit-learn",
-                "xgboost", "lightgbm", "transformers",
-                "machine learning", "deep learning", "neural network",
-                "artificial intelligence", "ai model", "ml framework"
-        );
+        return scoreMachineLearning(name, null, null, null, text) >= SCORE_THRESHOLD;
+    }
+
+    private int scoreDataVisualization(String name, String description, List<String> keywords, String language, String searchText) {
+        int score = 0;
+        
+        // Strong signals from library name (weight: 10)
+        if (containsAny(name.toLowerCase(),
+                "matplotlib", "plotly", "d3", "d3.js", "chart.js",
+                "echarts", "highcharts", "recharts", "victory",
+                "seaborn", "bokeh", "altair", "vega", "observable",
+                "nivo", "visx", "react-chartjs", "apexcharts"
+        )) {
+            score += NAME_MATCH_WEIGHT;
+        }
+        
+        // Medium signals from description (weight: 5)
+        if (description != null) {
+            String descLower = description.toLowerCase();
+            if (containsAny(descLower,
+                    "visualization", "chart", "graph", "plot", "plotting",
+                    "dashboard", "data viz", "data visualization"
+            )) {
+                score += DESCRIPTION_WEIGHT;
+            }
+        }
+        
+        // Weak signals from keywords (weight: 3 each, max 2)
+        int keywordMatches = 0;
+        if (keywords != null) {
+            for (String keyword : keywords) {
+                if (containsAny(keyword.toLowerCase(),
+                        "chart", "graph", "plot", "visualization", "viz"
+                )) {
+                    keywordMatches++;
+                    if (keywordMatches <= 2) {
+                        score += KEYWORD_WEIGHT;
+                    }
+                }
+            }
+        }
+        
+        return Math.max(0, score);
     }
 
     private boolean isDataVisualization(String text, String name) {
-        return containsAny(text,
-                "matplotlib", "plotly", "d3", "chart.js",
-                "echarts", "highcharts", "recharts",
-                "visualization", "chart", "graph", "plot",
-                "dashboard", "data viz"
-        );
+        return scoreDataVisualization(name, null, null, null, text) >= SCORE_THRESHOLD;
+    }
+
+    private int scoreLogging(String name, String description, List<String> keywords, String language, String searchText) {
+        int score = 0;
+        
+        // Strong signals from library name (weight: 10)
+        if (containsAny(name.toLowerCase(),
+                "log4j", "slf4j", "logback", "winston", "bunyan", "pino",
+                "serilog", "nlog", "zap", "zerolog", "logrus",
+                "log4net", "log4cpp", "spdlog", "glog", "plog"
+        )) {
+            score += NAME_MATCH_WEIGHT;
+        }
+        
+        // Medium signals from description (weight: 5)
+        if (description != null) {
+            String descLower = description.toLowerCase();
+            if (containsAny(descLower,
+                    "logging", "logger", "log", "log management", "log framework",
+                    "log aggregation", "structured logging", "log levels"
+            )) {
+                score += DESCRIPTION_WEIGHT;
+            }
+            // Negative context reduces score
+            if (containsAny(descLower, "dialog", "login", "authentication", "sign in")) {
+                score -= DESCRIPTION_WEIGHT;
+            }
+        }
+        
+        // Weak signals from keywords (weight: 3 each, max 2)
+        int keywordMatches = 0;
+        if (keywords != null) {
+            for (String keyword : keywords) {
+                if (containsAny(keyword.toLowerCase(),
+                        "log", "logging", "logger"
+                )) {
+                    keywordMatches++;
+                    if (keywordMatches <= 2) {
+                        score += KEYWORD_WEIGHT;
+                    }
+                }
+            }
+        }
+        
+        return Math.max(0, score);
     }
 
     private boolean isLogging(String text, String name) {
-        return containsAny(text,
-                "log4j", "slf4j", "logback", "winston", "bunyan",
-                "serilog", "nlog", "zap",
-                "logging", "logger", "log", "log management"
-        ) && !containsAny(text, "dialog", "login"); // Exclude false positives
+        return scoreLogging(name, null, null, null, text) >= SCORE_THRESHOLD;
+    }
+
+    private int scoreSecurity(String name, String description, List<String> keywords, String language, String searchText) {
+        int score = 0;
+        
+        // Strong signals from library name (weight: 10)
+        if (containsAny(name.toLowerCase(),
+                "passport", "jwt", "jsonwebtoken", "oauth", "oauth2",
+                "bcrypt", "argon2", "scrypt", "pbkdf2",
+                "spring-security", "helmet", "csrf", "sanitize",
+                "cors", "rate-limit", "express-rate-limit",
+                "crypto-js", "node-forge", "tweetnacl", "libsodium"
+        )) {
+            score += NAME_MATCH_WEIGHT;
+        }
+        
+        // Medium signals from description (weight: 5)
+        if (description != null) {
+            String descLower = description.toLowerCase();
+            if (containsAny(descLower,
+                    "security", "authentication", "auth", "authorization",
+                    "encryption", "crypto", "cryptography"
+            )) {
+                score += DESCRIPTION_WEIGHT;
+            }
+            if (containsAny(descLower,
+                    "jwt", "token", "session", "password", "hash",
+                    "xss", "csrf", "sql injection", "security headers"
+            )) {
+                score += DESCRIPTION_WEIGHT;
+            }
+        }
+        
+        // Weak signals from keywords (weight: 3 each, max 2)
+        int keywordMatches = 0;
+        if (keywords != null) {
+            for (String keyword : keywords) {
+                if (containsAny(keyword.toLowerCase(),
+                        "security", "auth", "encryption", "crypto", "jwt", "oauth"
+                )) {
+                    keywordMatches++;
+                    if (keywordMatches <= 2) {
+                        score += KEYWORD_WEIGHT;
+                    }
+                }
+            }
+        }
+        
+        return Math.max(0, score);
     }
 
     private boolean isSecurity(String text, String name) {
-        return containsAny(text,
-                "passport", "jwt", "oauth", "bcrypt", "argon2",
-                "spring-security", "helmet", "csrf",
-                "security", "authentication", "authorization",
-                "encryption", "crypto", "ssl", "tls"
-        );
+        return scoreSecurity(name, null, null, null, text) >= SCORE_THRESHOLD;
+    }
+
+    private int scoreSerialization(String name, String description, List<String> keywords, String language, String searchText) {
+        int score = 0;
+        
+        // Extract artifact name from Maven coordinates
+        String artifactName = extractArtifactName(name);
+        String nameLower = (artifactName != null) ? artifactName.toLowerCase() : "";
+        String originalNameLower = (name != null) ? name.toLowerCase() : "";
+        
+        // Strong signals from library name (weight: 10)
+        String[] patterns = {
+            "jackson", "jackson-databind", "jackson-core", "jackson-annotations", "gson", "moshi", "kotlinx-serialization",
+            "serde", "serde_json", "protobuf", "protobufjs",
+            "avro", "msgpack", "bson", "cbor", "messagepack",
+            "fastjson", "jsoniter", "json-simple", "org.json", "fasterxml"
+        };
+        
+        if (containsAny(nameLower, patterns) || containsAny(originalNameLower, patterns)) {
+            score += NAME_MATCH_WEIGHT;
+        }
+        
+        // Medium signals from description (weight: 5)
+        if (description != null) {
+            String descLower = description.toLowerCase();
+            if (containsAny(descLower,
+                    "json", "xml", "yaml", "toml", "serialization",
+                    "parser", "parse", "serialize", "deserialize"
+            )) {
+                score += DESCRIPTION_WEIGHT;
+            }
+            // Negative context reduces score
+            if (containsAny(descLower,
+                    "framework", "server", "web framework", "api framework"
+            )) {
+                score -= DESCRIPTION_WEIGHT;
+            }
+        }
+        
+        // Weak signals from keywords (weight: 3 each, max 2)
+        int keywordMatches = 0;
+        if (keywords != null) {
+            for (String keyword : keywords) {
+                if (containsAny(keyword.toLowerCase(),
+                        "json", "xml", "yaml", "serialization", "parser"
+                )) {
+                    keywordMatches++;
+                    if (keywordMatches <= 2) {
+                        score += KEYWORD_WEIGHT;
+                    }
+                }
+            }
+        }
+        
+        // Bonus if name matched but description/keywords are missing
+        boolean hasNameMatch = score >= NAME_MATCH_WEIGHT;
+        boolean missingMetadata = (description == null || description.trim().isEmpty()) && 
+                                  (keywords == null || keywords.isEmpty());
+        if (hasNameMatch && missingMetadata) {
+            score += NAME_ONLY_BONUS;
+        }
+        
+        return Math.max(0, score);
     }
 
     private boolean isSerialization(String text, String name) {
-        return containsAny(text,
-                "jackson", "gson", "serde", "protobuf",
-                "avro", "msgpack", "bson",
-                "json", "xml", "yaml", "serialization",
-                "parser", "serialize", "deserialize"
-        ) && !containsAny(text, "framework", "server"); // Avoid false positives
+        return scoreSerialization(name, null, null, null, text) >= SCORE_THRESHOLD;
+    }
+
+    private int scoreMobile(String name, String description, List<String> keywords, String language, String platform, String searchText) {
+        int score = 0;
+        
+        // Strong signals from library name (weight: 10)
+        if (containsAny(name.toLowerCase(),
+                "react-native", "flutter", "ionic", "xamarin", "cordova",
+                "capacitor", "native", "expo", "titanium", "phonegap"
+        )) {
+            score += NAME_MATCH_WEIGHT;
+        }
+        
+        // Platform-specific bonus (weight: 10)
+        if ("CocoaPods".equalsIgnoreCase(platform)) {
+            score += NAME_MATCH_WEIGHT;
+        }
+        
+        // Medium signals from description (weight: 5)
+        if (description != null) {
+            String descLower = description.toLowerCase();
+            if (containsAny(descLower,
+                    "android", "ios", "mobile", "mobile app", "mobile development",
+                    "cross-platform", "native", "hybrid", "app development"
+            )) {
+                score += DESCRIPTION_WEIGHT;
+            }
+        }
+        
+        // Weak signals from keywords (weight: 3 each, max 2)
+        int keywordMatches = 0;
+        if (keywords != null) {
+            for (String keyword : keywords) {
+                if (containsAny(keyword.toLowerCase(),
+                        "mobile", "android", "ios", "native", "hybrid"
+                )) {
+                    keywordMatches++;
+                    if (keywordMatches <= 2) {
+                        score += KEYWORD_WEIGHT;
+                    }
+                }
+            }
+        }
+        
+        return Math.max(0, score);
     }
 
     private boolean isMobile(String text, String name, String platform) {
-        return containsAny(text,
-                "react-native", "flutter", "ionic", "xamarin",
-                "android", "ios", "mobile", "cordova"
-        ) || "CocoaPods".equalsIgnoreCase(platform);
+        return scoreMobile(name, null, null, null, platform, text) >= SCORE_THRESHOLD;
+    }
+
+    private int scoreGaming(String name, String description, List<String> keywords, String language, String searchText) {
+        int score = 0;
+        
+        // Strong signals from library name (weight: 10)
+        if (containsAny(name.toLowerCase(),
+                "unity", "unreal", "godot", "pygame", "phaser",
+                "cocos2d", "libgdx", "monogame", "love2d", "defold",
+                "construct", "gamemaker", "rpgmaker", "renpy"
+        )) {
+            score += NAME_MATCH_WEIGHT;
+        }
+        
+        // Medium signals from description (weight: 5)
+        if (description != null) {
+            String descLower = description.toLowerCase();
+            if (containsAny(descLower,
+                    "game engine", "game development", "gaming", "game framework",
+                    "3d graphics", "2d graphics", "game physics"
+            )) {
+                score += DESCRIPTION_WEIGHT;
+            }
+        }
+        
+        // Weak signals from keywords (weight: 3 each, max 2)
+        int keywordMatches = 0;
+        if (keywords != null) {
+            for (String keyword : keywords) {
+                if (containsAny(keyword.toLowerCase(),
+                        "game", "gaming", "engine", "graphics", "physics"
+                )) {
+                    keywordMatches++;
+                    if (keywordMatches <= 2) {
+                        score += KEYWORD_WEIGHT;
+                    }
+                }
+            }
+        }
+        
+        return Math.max(0, score);
     }
 
     private boolean isGaming(String text, String name) {
-        return containsAny(text,
-                "unity", "unreal", "godot", "pygame", "phaser",
-                "game engine", "game development", "gaming",
-                "3d graphics", "game framework"
-        );
+        return scoreGaming(name, null, null, null, text) >= SCORE_THRESHOLD;
+    }
+
+    private int scoreIoT(String name, String description, List<String> keywords, String language, String searchText) {
+        int score = 0;
+        
+        // Strong signals from library name (weight: 10)
+        if (containsAny(name.toLowerCase(),
+                "arduino", "raspberry", "raspberry pi", "mqtt", "coap",
+                "esp32", "esp8266", "micropython", "circuitpython"
+        )) {
+            score += NAME_MATCH_WEIGHT;
+        }
+        
+        // Medium signals from description (weight: 5)
+        if (description != null) {
+            String descLower = description.toLowerCase();
+            if (containsAny(descLower,
+                    "iot", "internet of things", "embedded", "embedded systems",
+                    "sensor", "actuator", "hardware", "microcontroller"
+            )) {
+                score += DESCRIPTION_WEIGHT;
+            }
+        }
+        
+        // Weak signals from keywords (weight: 3 each, max 2)
+        int keywordMatches = 0;
+        if (keywords != null) {
+            for (String keyword : keywords) {
+                if (containsAny(keyword.toLowerCase(),
+                        "iot", "embedded", "sensor", "hardware", "microcontroller"
+                )) {
+                    keywordMatches++;
+                    if (keywordMatches <= 2) {
+                        score += KEYWORD_WEIGHT;
+                    }
+                }
+            }
+        }
+        
+        return Math.max(0, score);
     }
 
     private boolean isIoT(String text, String name) {
-        return containsAny(text,
-                "arduino", "raspberry pi", "mqtt", "embedded",
-                "iot", "internet of things", "sensor",
-                "hardware", "microcontroller"
-        );
+        return scoreIoT(name, null, null, null, text) >= SCORE_THRESHOLD;
+    }
+
+    private int scoreUtilities(String name, String description, List<String> keywords, String language, String searchText) {
+        int score = 0;
+        
+        // Extract artifact name from Maven coordinates
+        String artifactName = extractArtifactName(name);
+        String nameLower = (artifactName != null) ? artifactName.toLowerCase() : "";
+        String originalNameLower = (name != null) ? name.toLowerCase() : "";
+        
+        // Strong signals from library name (weight: 10)
+        String[] patterns = {
+            "lodash", "lodash.js", "underscore", "ramda", "guava", "apache-commons",
+            "commons-lang", "commons-io", "commons-collections",
+            "boost", "abseil", "folly", "utilities", "utils"
+        };
+        
+        if (containsAny(nameLower, patterns) || containsAny(originalNameLower, patterns)) {
+            score += NAME_MATCH_WEIGHT;
+            // Reduce score if it's something more specific
+            if (containsAny(searchText,
+                    "framework", "server", "database", "test", "testing",
+                    "web", "http", "api", "orm", "sql"
+            )) {
+                score -= DESCRIPTION_WEIGHT; // Penalty for false positives
+            }
+        }
+        
+        // Medium signals from description (weight: 5)
+        if (description != null) {
+            String descLower = description.toLowerCase();
+            if (containsAny(descLower,
+                    "utility", "utilities", "helper", "helpers", "common",
+                    "utils", "toolkit", "tool", "general purpose"
+            )) {
+                score += DESCRIPTION_WEIGHT;
+            }
+            // Exclude if it's something more specific
+            if (containsAny(descLower,
+                    "framework", "server", "database", "test", "testing",
+                    "web", "http", "api", "orm", "sql", "authentication"
+            )) {
+                score -= DESCRIPTION_WEIGHT;
+            }
+        }
+        
+        // Weak signals from keywords (weight: 3 each, max 2)
+        int keywordMatches = 0;
+        if (keywords != null) {
+            for (String keyword : keywords) {
+                if (containsAny(keyword.toLowerCase(),
+                        "utility", "utils", "helper", "common", "tool"
+                )) {
+                    keywordMatches++;
+                    if (keywordMatches <= 2) {
+                        score += KEYWORD_WEIGHT;
+                    }
+                }
+            }
+        }
+        
+        // Bonus if name matched but description/keywords are missing
+        boolean hasNameMatch = score >= NAME_MATCH_WEIGHT;
+        boolean missingMetadata = (description == null || description.trim().isEmpty()) && 
+                                  (keywords == null || keywords.isEmpty());
+        if (hasNameMatch && missingMetadata) {
+            score += NAME_ONLY_BONUS;
+        }
+        
+        return Math.max(0, score);
     }
 
     private boolean isUtilities(String text, String name) {
-        // Utilities is a catch-all for general purpose tools
-        return containsAny(text,
-                "lodash", "underscore", "ramda", "guava",
-                "apache-commons", "boost",
-                "utility", "helper", "common", "utils"
-        ) && !containsAny(text,
-                "framework", "server", "database", "test"); // Not if it's something more specific
+        return scoreUtilities(name, null, null, null, text) >= SCORE_THRESHOLD;
     }
 
     // ============================================
     // HELPER METHODS
     // ============================================
+
+    /**
+     * Extract artifact name from Maven coordinates or package names
+     * Examples:
+     * - "org.springframework.boot:spring-boot" -> "spring-boot"
+     * - "com.fasterxml.jackson.core:jackson-databind" -> "jackson-databind"
+     * - "lodash" -> "lodash"
+     * - "requests" -> "requests"
+     */
+    // Cache for extracted artifact names to avoid repeated logging
+    private static final Map<String, String> artifactNameCache = new HashMap<>();
+    
+    private String extractArtifactName(String name) {
+        if (name == null || name.isEmpty()) {
+            return "";
+        }
+        
+        // Check cache first
+        if (artifactNameCache.containsKey(name)) {
+            return artifactNameCache.get(name);
+        }
+        
+        String originalName = name;
+        String extracted = name;
+        
+        // Handle Maven coordinates (groupId:artifactId)
+        if (name.contains(":")) {
+            String[] parts = name.split(":");
+            if (parts.length >= 2) {
+                extracted = parts[parts.length - 1]; // Get the last part (artifactId)
+                System.out.println("       → Extracted artifact name: '" + originalName + "' -> '" + extracted + "'");
+            }
+        }
+        // Handle scoped NPM packages (@scope/package -> package)
+        else if (name.startsWith("@") && name.contains("/")) {
+            String[] parts = name.split("/");
+            if (parts.length >= 2) {
+                extracted = parts[parts.length - 1];
+                System.out.println("       → Extracted package name: '" + originalName + "' -> '" + extracted + "'");
+            }
+        }
+        
+        // Cache the result
+        artifactNameCache.put(name, extracted);
+        return extracted;
+    }
 
     private String buildSearchText(String name, String description, List<String> keywords) {
         StringBuilder sb = new StringBuilder();
@@ -410,13 +1310,17 @@ public class CategoryService {
         return sb.toString();
     }
 
+    /**
+     * Check if text contains any of the keywords (case-insensitive)
+     */
     private boolean containsAny(String text, String... keywords) {
         if (text == null || text.isEmpty()) {
             return false;
         }
 
+        String textLower = text.toLowerCase();
         for (String keyword : keywords) {
-            if (text.contains(keyword.toLowerCase())) {
+            if (keyword != null && textLower.contains(keyword.toLowerCase())) {
                 return true;
             }
         }
