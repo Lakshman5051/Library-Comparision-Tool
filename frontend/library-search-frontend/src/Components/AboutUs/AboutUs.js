@@ -82,11 +82,11 @@ function AboutUs({ onBack }) {
               </li>
               <li>
                 <strong>Quality Assessment:</strong> Automated grading system (A+ to F) based on 
-                GitHub stars, downloads, maintenance activity, and security
+                GitHub stars, maintenance activity, and security
               </li>
               <li>
                 <strong>Advanced Filtering:</strong> Filter by language, platform, category, and 
-                sort by popularity, downloads, or last updated
+                sort by popularity, stars, dependents, or last updated
               </li>
               <li>
                 <strong>Data-Driven Insights:</strong> Make informed decisions based on actual 

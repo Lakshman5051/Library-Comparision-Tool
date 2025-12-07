@@ -148,7 +148,7 @@
   padding: 0;
   background: transparent;
   border: none;
-  color: #64748b;
+  color: #1e293b;
   font-size: 0.95rem;
   font-weight: 500;
   cursor: pointer;
@@ -163,6 +163,16 @@
 
 .nav-item:hover {
   color: #7c3aed;
+}
+
+.nav-item svg {
+  color: #1e293b;
+  stroke: #1e293b;
+}
+
+.nav-item:hover svg {
+  color: #7c3aed;
+  stroke: #7c3aed;
 }
 
 .nav-item:hover svg {
