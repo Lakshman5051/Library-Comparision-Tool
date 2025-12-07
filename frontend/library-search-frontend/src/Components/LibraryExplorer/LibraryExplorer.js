@@ -35,7 +35,6 @@ function LibraryExplorer({ user }) {
   const uniqueCategories = useMemo(() => {
     const s = new Set();
     libraries.forEach(lib => {
-      if (lib.category) s.add(lib.category);
       if (lib.categories) {
         lib.categories.split(',').forEach(c => { const t = c.trim(); if (t) s.add(t); });
       }
@@ -107,7 +106,9 @@ function LibraryExplorer({ user }) {
     }
 
     if (categoryFilter) {
-      result = result.filter((lib) => lib.category === categoryFilter);
+      result = result.filter((lib) => 
+        lib.categories && lib.categories.toLowerCase().includes(categoryFilter.toLowerCase())
+      );
     }
 
     if (frameworkFilter) {
@@ -121,7 +122,7 @@ function LibraryExplorer({ user }) {
       );
     } else if (sortKey === 'recent') {
       result.sort(
-        (a, b) => new Date(b.lastUpdated) - new Date(a.lastUpdated)
+        (a, b) => new Date(b.lastRepositoryReleaseDate || b.lastRegistryReleaseDate || 0) - new Date(a.lastRepositoryReleaseDate || a.lastRegistryReleaseDate || 0)
       );
     }
 
