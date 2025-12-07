@@ -49,20 +49,9 @@ public class CompleteUser extends User {
         @Column(name = "last_login_at")
         private LocalDateTime lastLoginAt;
 
-        // ============================================
-        // RELATIONSHIPS - This is where the magic happens!
-        // ============================================
 
         /**
-         * RELATIONSHIP 1: User → Roles (One-to-Many)
-         * One user can have multiple roles (USER, ADMIN)
-         */
-        @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
-        @Builder.Default
-        private Set<UserRole> userRoles = new HashSet<>();
-
-        /**
-         * RELATIONSHIP 2: User → Projects (One-to-Many)
+         * RELATIONSHIP 1: User → Projects (One-to-Many)
          * One user can have multiple projects
          */
         @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
@@ -70,47 +59,14 @@ public class CompleteUser extends User {
         private Set<Project> projects = new HashSet<>();
 
         /**
-         * RELATIONSHIP 3: User → Favorites (One-to-Many)
+         * RELATIONSHIP 2: User → Favorites (One-to-Many)
          * One user can favorite multiple libraries
          */
         @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
         @Builder.Default
         private Set<Favorite> favorites = new HashSet<>();
 
-        // ============================================
-        // HELPER METHODS FOR ROLES
-        // ============================================
 
-        public void addRole(Role role) {
-            UserRole userRole = new UserRole();
-            userRole.setUser(this);
-            userRole.setRole(role);
-            userRole.setGrantedAt(LocalDateTime.now());
-            userRoles.add(userRole);
-        }
-
-        public void removeRole(Role role) {
-            userRoles.removeIf(ur -> ur.getRole().equals(role));
-        }
-
-        public boolean hasRole(Role role) {
-            return userRoles.stream()
-                    .anyMatch(ur -> ur.getRole().equals(role));
-        }
-
-        public Set<Role> getRoles() {
-            Set<Role> roles = new HashSet<>();
-            userRoles.forEach(ur -> roles.add(ur.getRole()));
-            return roles;
-        }
-
-        public boolean isAdmin() {
-            return hasRole(Role.ADMIN);
-        }
-
-        // ============================================
-        // HELPER METHODS FOR PROJECTS
-        // ============================================
 
         /**
          * Add a project to this user

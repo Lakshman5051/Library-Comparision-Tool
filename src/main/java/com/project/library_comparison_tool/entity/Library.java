@@ -29,10 +29,8 @@ public class Library {
     @Column(nullable = false)
     private String name;
 
-    private String category;
-
     @Column(length = 500)
-    private String categories;
+    private String categories; // Comma-separated list of categories (multi-category support)
 
     @Column(length = 1000)
     private String description;
@@ -44,31 +42,23 @@ public class Library {
     private String packageManager;
 
 
-
-    private String supplier;
     private String licenseType;
     private String cost;
 
 
     private String latestVersion;
-    private String lastUpdated;
-
-
+    private String lastRegistryReleaseDate; // From package registry (npm, pypi, maven, etc.)
 
 
     //metrics
     private Integer githubStars;
-
-    private Long downloadsLast30Days;
-
-
     private Integer githubForks;
 
 
     private Integer dependentProjectsCount;
 
 
-    private LocalDate lastCommitDate;
+    private LocalDate lastRepositoryReleaseDate; // From GitHub/GitLab repository
 
 
     @Column(columnDefinition = "boolean default false")
@@ -78,16 +68,22 @@ public class Library {
     @Column(columnDefinition = "boolean default false")
     private Boolean hasSecurityVulnerabilities;
 
+    @Column
+    private Integer vulnerabilityCount; // Count of known vulnerabilities
+
+    @OneToMany(
+            mappedBy = "library",
+            cascade = CascadeType.ALL,
+            orphanRemoval = true,
+            fetch = FetchType.LAZY
+    )
+    @Builder.Default
+    private List<Vulnerability> vulnerabilities = new ArrayList<>();
 
     private String homepageUrl;              // Official website
     private String repositoryUrl;            // GitHub/GitLab repo
     private String documentationUrl;         // Docs site
     private String packageUrl;               // Maven Central, npm registry, etc.
-
-
-
-
-    private String keywords;
 
 
     @ElementCollection
@@ -109,7 +105,10 @@ public class Library {
     private List<String> supportedOs = new ArrayList<>();
 
     @Column(columnDefinition = "TEXT")
-    private String exampleCodeSnippet;
+    private String exampleCodeSnippet; // Code example showing how to use the library
+
+    @Column(length = 2000)
+    private String useCase; // Plain English description of when/why to use this library (for non-technical users)
 
     // entity relationships
     @OneToMany(
@@ -120,6 +119,29 @@ public class Library {
     )
     @Builder.Default
     private List<LibraryDependency> dependencies = new ArrayList<>();
+
+    // Helper methods for managing vulnerabilities
+    public void addVulnerability(Vulnerability vulnerability) {
+        vulnerabilities.add(vulnerability);
+        vulnerability.setLibrary(this);
+        updateVulnerabilityCount();
+    }
+
+    public void removeVulnerability(Vulnerability vulnerability) {
+        vulnerabilities.remove(vulnerability);
+        vulnerability.setLibrary(null);
+        updateVulnerabilityCount();
+    }
+
+    public void clearVulnerabilities() {
+        vulnerabilities.clear();
+        updateVulnerabilityCount();
+    }
+
+    private void updateVulnerabilityCount() {
+        this.vulnerabilityCount = vulnerabilities != null ? vulnerabilities.size() : 0;
+        this.hasSecurityVulnerabilities = vulnerabilityCount != null && vulnerabilityCount > 0;
+    }
 
     // Helper methods for managing dependencies
     public void addDependency(LibraryDependency dependency) {
@@ -132,80 +154,29 @@ public class Library {
         dependency.setLibrary(null);
     }
 
-    // combine different metrics to showcase in rank wise
+    // All scoring logic has been moved to ComparisonService
+        
+    @Deprecated
     public double getPopularityScore() {
-        double score = 0.0;
-
-        if (githubStars != null) {
-            score += githubStars * 0.1;
-        }
-
-        if (downloadsLast30Days != null) {
-            score += downloadsLast30Days * 0.00001; // Scale down large numbers
-        }
-
-        if (dependentProjectsCount != null) {
-            score += dependentProjectsCount * 0.5;
-        }
-
-        // Penalize deprecated or vulnerable libraries
-        if (Boolean.TRUE.equals(isDeprecated)) {
-            score *= 0.1;
-        }
-
-        if (Boolean.TRUE.equals(hasSecurityVulnerabilities)) {
-            score *= 0.5;
-        }
-
-        return score;
+        // Legacy method - kept for backward compatibility
+        // Returns default value - use ComparisonService for accurate score
+        return 0.0;
     }
-
-    // library status(actively maintained or not)
+    
+    @Deprecated
     public boolean isActivelyMaintained() {
-        if (lastCommitDate == null) {
+        // Legacy method - kept for backward compatibility
+        if (lastRepositoryReleaseDate == null) {
             return false;
         }
-
         LocalDate sixMonthsAgo = LocalDate.now().minusMonths(6);
-        return lastCommitDate.isAfter(sixMonthsAgo);
+        return lastRepositoryReleaseDate.isAfter(sixMonthsAgo);
     }
 
-    //quality indicator
+    @Deprecated
     public String getQualityGrade() {
-        double score = 0;
-        int factors = 0;
-
-        // Stars (out of 10)
-        if (githubStars != null) {
-            score += Math.min(githubStars / 1000.0, 10);
-            factors++;
-        }
-
-        //Active maintenance (out of 10)
-        if (isActivelyMaintained()) {
-            score += 10;
-        }
-        factors++;
-
-        // No security issues (out of 10)
-        if (!Boolean.TRUE.equals(hasSecurityVulnerabilities)) {
-            score += 10;
-        }
-        factors++;
-
-        // Has dependents (out of 10)
-        if (dependentProjectsCount != null && dependentProjectsCount > 0) {
-            score += Math.min(dependentProjectsCount / 100.0, 10);
-            factors++;
-        }
-
-        // Calculate average
-        double avgScore = factors > 0 ? score / factors : 0;
-
-        if (avgScore >= 9) return "A";
-        if (avgScore >= 7) return "B";
-        if (avgScore >= 5) return "C";
-        if (avgScore >= 3) return "D";
-        return "F";
+        // Legacy method - kept for backward compatibility
+        // Returns default grade - use ComparisonService for accurate grade
+        return "C";
     }
 }
