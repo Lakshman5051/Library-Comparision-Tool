@@ -155,7 +155,7 @@ public class Library {
     }
 
     // All scoring logic has been moved to ComparisonService
-        
+
     @Deprecated
     public double getPopularityScore() {
         // Legacy method - kept for backward compatibility

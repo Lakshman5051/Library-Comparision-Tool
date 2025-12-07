@@ -76,7 +76,7 @@ public class User {
         @Column(name = "role", nullable = false, length = 20)
         @Builder.Default
         private Role role = Role.USER;
-        
+
         /**
          * Check if user has a specific role
          */
