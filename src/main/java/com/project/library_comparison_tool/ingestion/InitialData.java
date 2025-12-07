@@ -35,16 +35,19 @@ public class InitialData implements CommandLineRunner {
         // Example: Jackson
         Library jackson = Library.builder()
                 .name("Jackson Databind")
-                .category("JSON Serialization")
+                .categories("Serialization, Utilities")
                 .description("High-performance JSON processor for Java that maps JSON <-> POJOs.")
                 .framework("spring")
                 .runtimeEnvironment("jvm")
-                .supplier("FasterXML")
                 .licenseType("Apache-2.0")
                 .cost("Free / Open Source")
                 .latestVersion("2.17.2")
-                .lastUpdated("2025-10-26")
+                .lastRegistryReleaseDate("2025-10-26")
                 .supportedOs(List.of("linux", "windows", "macos"))
+                .githubStars(9500) // Approximate GitHub stars for Jackson
+                .githubForks(2400)
+                .dependentProjectsCount(150000)
+                .useCase("Jackson Databind helps you convert data between different formats (like JSON) in Java projects. Perfect for developers who need reliable, well-maintained tools to enhance their applications.")
                 .exampleCodeSnippet(
                         "ObjectMapper mapper = new ObjectMapper();\n" +
                                 "User user = mapper.readValue(jsonString, User.class);\n" +
@@ -65,16 +68,19 @@ public class InitialData implements CommandLineRunner {
         // Example: Gson
         Library gson = Library.builder()
                 .name("Gson")
-                .category("JSON Serialization")
+                .categories("Serialization, Utilities")
                 .description("Google's JSON library to convert Java Objects to JSON and back.")
                 .framework("none")
                 .runtimeEnvironment("jvm")
-                .supplier("Google")
                 .licenseType("Apache-2.0")
                 .cost("Free / Open Source")
                 .latestVersion("2.11.0")
-                .lastUpdated("2025-10-26")
+                .lastRegistryReleaseDate("2025-10-26")
                 .supportedOs(List.of("linux", "windows", "macos"))
+                .githubStars(23000) // Approximate GitHub stars for Gson
+                .githubForks(4200)
+                .dependentProjectsCount(200000)
+                .useCase("Gson helps you convert data between different formats (like JSON) in Java projects. Perfect for developers who need reliable, well-maintained tools to enhance their applications.")
                 .exampleCodeSnippet(
                         "Gson gson = new Gson();\n" +
                                 "User user = gson.fromJson(jsonString, User.class);\n" +
@@ -95,19 +101,23 @@ public class InitialData implements CommandLineRunner {
         // Example: Log4j 2
         Library log4j2 = Library.builder()
                 .name("Apache Log4j 2")
-                .category("Logging")
+                .categories("Logging, Utilities")
                 .description("Logging framework for Java with async logging and rich appenders.")
                 .framework("spring")
                 .runtimeEnvironment("jvm")
-                .supplier("Apache Software Foundation")
                 .licenseType("Apache-2.0")
                 .cost("Free / Open Source")
                 .latestVersion("2.23.1")
-                .lastUpdated("2025-10-26")
+                .lastRegistryReleaseDate("2025-10-26")
                 .supportedOs(List.of("linux", "windows", "macos"))
+                .githubStars(3800) // Approximate GitHub stars for Log4j 2
+                .githubForks(1800)
+                .dependentProjectsCount(50000)
+                .useCase("Apache Log4j 2 helps you track and monitor your application's behavior and perform common programming tasks more easily in Java projects. Perfect for developers who need reliable, well-maintained tools to enhance their applications.")
                 .exampleCodeSnippet(
                         "private static final Logger log = LogManager.getLogger(MyClass.class);\n" +
-                                "log.info(\"Service started\");"
+                                "log.info(\"Service started\");\n" +
+                                "log.error(\"An error occurred\", exception);"
                 )
                 .build();
 
@@ -128,19 +138,23 @@ public class InitialData implements CommandLineRunner {
         // Example: Logback
         Library logback = Library.builder()
                 .name("Logback")
-                .category("Logging")
+                .categories("Logging, Utilities")
                 .description("Logging framework, default in Spring Boot via SLF4J binding.")
                 .framework("spring")
                 .runtimeEnvironment("jvm")
-                .supplier("QOS.ch")
                 .licenseType("EPL/LGPL")
                 .cost("Free / Open Source")
                 .latestVersion("1.5.6")
-                .lastUpdated("2025-10-26")
+                .lastRegistryReleaseDate("2025-10-26")
                 .supportedOs(List.of("linux", "windows", "macos"))
+                .githubStars(2100) // Approximate GitHub stars for Logback
+                .githubForks(900)
+                .dependentProjectsCount(80000)
+                .useCase("Logback helps you track and monitor your application's behavior and perform common programming tasks more easily in Java projects. Perfect for developers who need reliable, well-maintained tools to enhance their applications.")
                 .exampleCodeSnippet(
                         "private static final Logger log = LoggerFactory.getLogger(MyClass.class);\n" +
-                                "log.info(\"Starting up\");"
+                                "log.info(\"Starting up\");\n" +
+                                "log.debug(\"Debug information\");"
                 )
                 .build();
 
