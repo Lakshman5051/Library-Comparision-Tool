@@ -71,6 +71,14 @@ public class EmailService {
 
             Response response = sendGrid.api(request);
 
+            // Always log the response for debugging
+            System.out.println("========================================");
+            System.out.println("SendGrid API Response:");
+            System.out.println("Status Code: " + response.getStatusCode());
+            System.out.println("Response Body: " + response.getBody());
+            System.out.println("Response Headers: " + response.getHeaders());
+            System.out.println("========================================");
+
             if (response.getStatusCode() >= 200 && response.getStatusCode() < 300) {
                 System.out.println("Verification email sent successfully to: " + toEmail);
             } else {
@@ -130,6 +138,14 @@ public class EmailService {
             request.setBody(mail.build());
 
             Response response = sendGrid.api(request);
+
+            // Always log the response for debugging
+            System.out.println("========================================");
+            System.out.println("SendGrid API Response:");
+            System.out.println("Status Code: " + response.getStatusCode());
+            System.out.println("Response Body: " + response.getBody());
+            System.out.println("Response Headers: " + response.getHeaders());
+            System.out.println("========================================");
 
             if (response.getStatusCode() >= 200 && response.getStatusCode() < 300) {
                 System.out.println("Login OTP email sent successfully to: " + toEmail);
