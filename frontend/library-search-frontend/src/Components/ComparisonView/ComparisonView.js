@@ -188,8 +188,7 @@ function ComparisonView({ libraries, onClose, onRemoveLibrary }) {
     <div className="comparison-view-fullscreen">
       <div className="comparison-header-fullscreen">
         <div className="header-content">
-          <h1>Library Comparison</h1>
-          <p className="comparison-subtitle">Comprehensive analysis of {libraries.length} libraries</p>
+          <h1>Analysis of {libraries.length} libraries</h1>
         </div>
         <div className="header-actions">
           <button className="export-btn export-png" onClick={exportChartsAsPNG}>

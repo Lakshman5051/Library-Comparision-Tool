@@ -16,6 +16,7 @@ import TermsOfService from './Components/TermsOfService/TermsOfService';
 import PrivacyPolicy from './Components/PrivacyPolicy/PrivacyPolicy';
 import WelcomeOnboarding from './Components/WelcomeOnboarding/WelcomeOnboarding';
 import UserDashboard from './Components/UserDashboard/UserDashboard';
+import ProjectWorkspace from './Components/ProjectWorkspace/ProjectWorkspace';
 import AccountManagement from './Components/AccountManagement/AccountManagement';
 
 // Services
@@ -255,6 +256,7 @@ function App() {
   const [showDashboard, setShowDashboard] = useState(false);
   const [showLibrarySearch, setShowLibrarySearch] = useState(false);
   const [showAccountManagement, setShowAccountManagement] = useState(false);
+  const [showProjectWorkspace, setShowProjectWorkspace] = useState(false);
   
   // Core Data State
   const [libraries, setLibraries] = useState([]);
@@ -386,13 +388,27 @@ const [excludeSecurityIssues, setExcludeSecurityIssues] = useState(false);
     setShowAdvancedSearch(false);
     
     setShowDashboard(false);
+    // Ensure Project Workspace is hidden when navigating to Library Search
+    setShowProjectWorkspace(false);
     setShowLibrarySearch(true);
     fetchAllLibraries();
   };
 
   const handleDashboardCreateProject = () => {
-    // TODO: Implement create project functionality
-    alert('Create Project feature coming soon!');
+    setShowDashboard(false);
+    setShowProjectWorkspace(true);
+  };
+
+  const handleShowProjects = () => {
+    setShowLandingPage(false);
+    setShowDashboard(false);
+    setShowLibrarySearch(false);
+    setShowProjectWorkspace(true);
+  };
+
+  const handleBackToDashboard = () => {
+    setShowProjectWorkspace(false);
+    setShowDashboard(true);
   };
 
   const handleDashboardViewFavorites = () => {
@@ -786,6 +802,7 @@ const handleAdvancedSearch = async () => {
       // Logged in users go to dashboard
       setShowLandingPage(false);
       setShowLibrarySearch(false);
+      setShowProjectWorkspace(false);
       setShowDashboard(true);
     } else {
       // Non-logged in users go to landing page
@@ -881,6 +898,7 @@ const handleAdvancedSearch = async () => {
           currentUser={null}
           onLogin={handleShowLogin}
           onSignup={handleShowSignup}
+          onSearchLibraries={handleDashboardSearchLibraries}
         />
         <LandingPage onGetStarted={handleGetStarted} />
         <Footer 
@@ -924,11 +942,12 @@ const handleAdvancedSearch = async () => {
   if (showLandingPage && isLoggedIn) {
     return (
       <div className="app">
-        {/* Header Component */}
         <Header 
           onHome={handleGoHome}
           isLoggedIn={true}
           currentUser={currentUser}
+          onProjects={handleShowProjects}
+          onSearchLibraries={handleDashboardSearchLibraries}
         >
           <UserBadge user={currentUser} onLogout={handleLogout} />
         </Header>
@@ -959,6 +978,36 @@ const handleAdvancedSearch = async () => {
     );
   }
 
+  // Show Project Workspace
+  if (showProjectWorkspace && isLoggedIn && currentUser) {
+    return (
+      <div className="app">
+        <Header 
+          onHome={handleGoHome}
+          isLoggedIn={true}
+          currentUser={currentUser}
+          onProjects={handleShowProjects}
+          onSearchLibraries={handleDashboardSearchLibraries}
+        >
+          <UserBadge 
+            user={currentUser} 
+            onLogout={handleLogout} 
+            onAccountSettings={() => setShowAccountManagement(true)} 
+          />
+        </Header>
+        <ProjectWorkspace onBack={handleBackToDashboard} />
+        <Footer 
+          onHome={handleGoHome}
+          onAboutUs={handleShowAboutUs}
+          onTerms={handleShowTerms}
+          onPrivacy={handleShowPrivacy}
+        />
+        {showTermsModal && <TermsOfService onClose={() => setShowTermsModal(false)} />}
+        {showPrivacyModal && <PrivacyPolicy onClose={() => setShowPrivacyModal(false)} />}
+      </div>
+    );
+  }
+
   // Show User Dashboard
   if (showDashboard && isLoggedIn && currentUser && !showLibrarySearch) {
     return (
@@ -967,6 +1016,9 @@ const handleAdvancedSearch = async () => {
           onHome={handleGoHome}
           isLoggedIn={true}
           currentUser={currentUser}
+          onProjects={handleShowProjects}
+          onSearchLibraries={handleDashboardSearchLibraries}
+          hideNav={true}
         >
           <UserBadge 
             user={currentUser} 
@@ -1019,6 +1071,8 @@ const handleAdvancedSearch = async () => {
         onHome={handleGoHome}
         isLoggedIn={true}
         currentUser={currentUser}
+        onProjects={handleShowProjects}
+        onSearchLibraries={handleDashboardSearchLibraries}
       >
         <UserBadge 
           user={currentUser} 

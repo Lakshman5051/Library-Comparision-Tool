@@ -35,7 +35,7 @@ function LandingPage({ onGetStarted }) {
               <span className="btn-arrow">→</span>
             </button>
             <button className="btn-secondary" onClick={onGetStarted}>
-              Create a Project
+              Project Workspace
             </button>
           </div>
 

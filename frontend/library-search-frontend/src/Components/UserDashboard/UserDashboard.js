@@ -14,12 +14,14 @@ function UserDashboard({ onSearchLibraries, onCreateProject, onViewFavorites }) 
           <button className="dashboard-card" onClick={onCreateProject}>
             <div className="dashboard-card-icon">
               <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M12 5v14M5 12h14"/>
+                <rect x="2" y="7" width="20" height="13" rx="2" ry="2"></rect>
+                <path d="M16 3H8a2 2 0 00-2 2v0a2 2 0 002 2h8a2 2 0 002-2v0a2 2 0 00-2-2z"></path>
+                <path d="M9 12h6" strokeLinecap="round" strokeLinejoin="round"></path>
               </svg>
             </div>
-            <h3 className="dashboard-card-title">Create a Project</h3>
+            <h3 className="dashboard-card-title">Project Workspace</h3>
             <p className="dashboard-card-description">
-              Start a new project and add libraries to build your tech stack
+              Create, view, and manage your projects with libraries
             </p>
           </button>
 

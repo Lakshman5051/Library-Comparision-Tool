@@ -72,7 +72,16 @@ export const checkAuthentication = async () => {
     });
 
     const data = await response.json();
-    return data.authenticated;
+    console.log('=== FRONTEND: checkAuthentication response ===');
+    console.log('Status:', response.status);
+    console.log('Response data:', data);
+    console.log('Authenticated:', data.authenticated);
+    
+    if (data.message) {
+      console.warn('Auth check message:', data.message);
+    }
+    
+    return data.authenticated === true;
   } catch (error) {
     console.error('Check authentication error:', error);
     return false;
