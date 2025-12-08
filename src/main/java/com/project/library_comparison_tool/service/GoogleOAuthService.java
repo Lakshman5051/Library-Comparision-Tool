@@ -6,6 +6,7 @@ import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.gson.GsonFactory;
 import com.project.library_comparison_tool.dto.GoogleUserInfo;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -14,10 +15,25 @@ import java.util.Collections;
 
 
 @Service
-public class GoogleOAuthService {
+@ConditionalOnProperty(name = "google.oauth.enabled", havingValue = "true", matchIfMissing = true)
+public class GoogleOAuthService implements IGoogleOAuthService {
 
     @Value("${google.oauth.client-id:}")
     private String googleClientId;
+
+    private GoogleIdTokenVerifier verifier;
+
+    private GoogleIdTokenVerifier getVerifier() {
+        if (verifier == null) {
+            verifier = new GoogleIdTokenVerifier.Builder(
+                    new NetHttpTransport(),
+                    new GsonFactory()
+            )
+            .setAudience(Collections.singletonList(googleClientId))
+            .build();
+        }
+        return verifier;
+    }
 
     //verify
     public GoogleUserInfo verifyGoogleToken(String idToken) throws GeneralSecurityException, IOException {
@@ -25,14 +41,9 @@ public class GoogleOAuthService {
         if (googleClientId == null || googleClientId.trim().isEmpty()) {
             throw new IllegalStateException("Google OAuth Client ID is not configured. Please set GOOGLE_OAUTH_CLIENT_ID environment variable.");
         }
-        
-        // Create verifier with your Google Client ID
-        GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(
-                new NetHttpTransport(),
-                new GsonFactory()
-        )
-        .setAudience(Collections.singletonList(googleClientId))
-        .build();
+
+        // Get or create verifier
+        GoogleIdTokenVerifier verifier = getVerifier();
 
         // Verify the token
         GoogleIdToken googleIdToken = verifier.verify(idToken);

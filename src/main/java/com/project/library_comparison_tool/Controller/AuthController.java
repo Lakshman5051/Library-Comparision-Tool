@@ -36,6 +36,9 @@ public class AuthController {
     @Autowired
     private com.project.library_comparison_tool.service.LoginOTPService loginOTPService;
 
+    @Autowired
+    private com.project.library_comparison_tool.service.PasswordResetOTPService passwordResetOTPService;
+
     // login or signup with google auth
     @PostMapping("/google")
     public ResponseEntity<AuthResponse> loginWithGoogle(
@@ -88,7 +91,8 @@ public class AuthController {
     //verify password and OTP
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(
-            @RequestBody LoginRequest loginRequest) {
+            @RequestBody LoginRequest loginRequest,
+            HttpSession session) {
 
         try {
             // Validate required fields
@@ -110,23 +114,14 @@ public class AuthController {
                                 .build());
             }
 
-            // Verify password (Step 1 of 2FA)
+            // Verify password
             AuthResponse response = authService.verifyPassword(loginRequest);
 
             if (response.getSuccess()) {
-                // Password is correct - send OTP
-                try {
-                    loginOTPService.sendLoginOTP(loginRequest.getEmail());
-                    response.setMessage("Password verified. OTP sent to your email. Please check your inbox.");
-                } catch (Exception e) {
-                    return ResponseEntity
-                            .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                            .body(AuthResponse.builder()
-                                    .success(false)
-                                    .message("Failed to send OTP: " + e.getMessage())
-                                    .build());
-                }
-                return ResponseEntity.ok(response);
+                // Password verified - complete login directly (no OTP required)
+                AuthResponse loginResponse = authService.completeLogin(loginRequest.getEmail(), session);
+                loginResponse.setMessage("Login successful");
+                return ResponseEntity.ok(loginResponse);
             } else {
                 return ResponseEntity
                         .status(HttpStatus.UNAUTHORIZED)
@@ -172,12 +167,42 @@ public class AuthController {
 
 
     @GetMapping("/check")
-    public ResponseEntity<Map<String, Boolean>> checkAuthentication(HttpSession session) {
+    public ResponseEntity<Map<String, Object>> checkAuthentication(HttpSession session) {
+        // DEBUG: Log session details
+        System.out.println("=== DEBUG: GET /api/auth/check ===");
+        System.out.println("Session: " + (session != null ? "exists" : "null"));
+        
+        Map<String, Object> response = new java.util.HashMap<>();
+        
+        if (session != null) {
+            System.out.println("Session ID: " + session.getId());
+            System.out.println("Session is new: " + session.isNew());
+            Long userId = (Long) session.getAttribute("userId");
+            System.out.println("User ID from session: " + userId);
+            
+            java.util.List<String> attributes = java.util.Collections.list(session.getAttributeNames());
+            System.out.println("All session attributes: " + attributes);
+            
         boolean isAuthenticated = authService.isAuthenticated(session);
+            System.out.println("Is authenticated: " + isAuthenticated);
+            
+            response.put("authenticated", isAuthenticated);
+            response.put("sessionExists", true);
+            response.put("sessionId", session.getId());
+            response.put("hasUserId", userId != null);
+            
+            // If not authenticated but session exists, provide helpful message
+            if (!isAuthenticated && attributes.isEmpty()) {
+                response.put("message", "Session exists but no login data found. Please log in.");
+            }
+        } else {
+            System.out.println("No session found");
+            response.put("authenticated", false);
+            response.put("sessionExists", false);
+            response.put("message", "No session found. Please log in.");
+        }
 
-        return ResponseEntity.ok(
-                Map.of("authenticated", isAuthenticated)
-        );
+        return ResponseEntity.ok(response);
     }
 
     //signup
@@ -291,7 +316,7 @@ public class AuthController {
         }
     }
 
-    //forgot password
+    //forgot password - send OTP
     @PostMapping("/forgot-password")
     public ResponseEntity<Map<String, String>> forgotPassword(
             @RequestBody ForgotPasswordRequest request) {
@@ -306,14 +331,102 @@ public class AuthController {
                         ));
             }
 
-            String token = passwordResetService.createPasswordResetToken(request.getEmail());
+            // Send OTP for password reset verification
+            passwordResetOTPService.sendPasswordResetOTP(request.getEmail());
 
-            // In production, send this token via email instead of returning it
-            // For now, we return it directly for testing
             return ResponseEntity.ok(Map.of(
                     "success", "true",
-                    "message", "Password reset instructions have been sent to your email",
-                    "token", token  // Remove this in production!
+                    "message", "Password reset verification code has been sent to your email"
+            ));
+
+        } catch (Exception e) {
+            return ResponseEntity
+                    .status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of(
+                            "success", "false",
+                            "message", e.getMessage()
+                    ));
+        }
+    }
+
+    //verify password reset OTP
+    @PostMapping("/verify-password-reset-otp")
+    public ResponseEntity<Map<String, String>> verifyPasswordResetOTP(
+            @RequestBody Map<String, String> request) {
+
+        try {
+            String email = request.get("email");
+            String otp = request.get("otp");
+
+            if (email == null || email.trim().isEmpty()) {
+                return ResponseEntity
+                        .badRequest()
+                        .header("Content-Type", "application/json")
+                        .body(Map.of(
+                                "success", "false",
+                                "message", "Email is required"
+                        ));
+            }
+
+            if (otp == null || otp.trim().isEmpty()) {
+                return ResponseEntity
+                        .badRequest()
+                        .header("Content-Type", "application/json")
+                        .body(Map.of(
+                                "success", "false",
+                                "message", "OTP code is required"
+                        ));
+            }
+
+            // Verify OTP
+            passwordResetOTPService.verifyPasswordResetOTP(email, otp);
+
+            // OTP verified - create password reset token
+            String token = passwordResetService.createPasswordResetToken(email);
+
+            return ResponseEntity.ok()
+                    .header("Content-Type", "application/json")
+                    .body(Map.of(
+                            "success", "true",
+                            "message", "OTP verified successfully. You can now reset your password.",
+                            "token", token
+                    ));
+
+        } catch (Exception e) {
+            System.err.println("Error verifying password reset OTP: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity
+                    .status(HttpStatus.BAD_REQUEST)
+                    .header("Content-Type", "application/json")
+                    .body(Map.of(
+                            "success", "false",
+                            "message", e.getMessage() != null ? e.getMessage() : "An error occurred during verification"
+                    ));
+        }
+    }
+
+    //resend password reset OTP
+    @PostMapping("/resend-password-reset-otp")
+    public ResponseEntity<Map<String, String>> resendPasswordResetOTP(
+            @RequestBody Map<String, String> request) {
+
+        try {
+            String email = request.get("email");
+
+            if (email == null || email.trim().isEmpty()) {
+                return ResponseEntity
+                        .badRequest()
+                        .body(Map.of(
+                                "success", "false",
+                                "message", "Email is required"
+                        ));
+            }
+
+            passwordResetOTPService.resendPasswordResetOTP(email);
+
+            return ResponseEntity.ok(Map.of(
+                    "success", "true",
+                    "message", "Password reset verification code has been resent to your email"
             ));
 
         } catch (Exception e) {

@@ -7,62 +7,61 @@ import com.sendgrid.SendGrid;
 import com.sendgrid.helpers.mail.Mail;
 import com.sendgrid.helpers.mail.objects.Content;
 import com.sendgrid.helpers.mail.objects.Email;
+import com.mailgun.api.v3.MailgunMessagesApi;
+import com.mailgun.client.MailgunClient;
+import com.mailgun.model.message.Message;
+import com.mailgun.model.message.MessageResponse;
+import feign.FeignException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.web.reactive.function.client.WebClient;
 
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
 
 @Service
 public class EmailService {
 
     private SendGrid sendGrid;
-    private WebClient resendWebClient;
+    private MailgunMessagesApi mailgunMessagesApi;
     private String fromEmail;
+    private String mailgunDomain;
     private boolean emailEnabled;
-    private String emailProvider; // "resend", "sendgrid", "aws-ses", or "console"
-    private String resendApiKey;
-    private String awsRegion;
-    private String awsAccessKeyId;
-    private String awsSecretAccessKey;
 
     public EmailService(
+            @Value("${app.email.enabled:true}") boolean emailEnabled,
             @Value("${sendgrid.api.key:}") String sendGridApiKey,
             @Value("${sendgrid.from.email:}") String sendGridFromEmail,
-            @Value("${app.email.enabled:true}") boolean emailEnabled,
-            @Value("${app.email.provider:resend}") String emailProvider,
-            @Value("${app.email.from:onboarding@resend.dev}") String fromEmail,
-            @Value("${resend.api.key:}") String resendApiKey,
-            @Value("${aws.ses.region:us-east-1}") String awsRegion,
-            @Value("${aws.ses.access-key-id:}") String awsAccessKeyId,
-            @Value("${aws.ses.secret-access-key:}") String awsSecretAccessKey) {
-        // Use app.email.from if set, otherwise fallback to sendgrid.from.email, then default
+            @Value("${mailgun.api.key:}") String mailgunApiKey,
+            @Value("${mailgun.domain:}") String mailgunDomain) {
+        this.emailEnabled = emailEnabled;
+        this.mailgunDomain = mailgunDomain;
+        
+        // Use provided fromEmail or fallback to sendgrid.from.email, then default
         this.fromEmail = (fromEmail != null && !fromEmail.trim().isEmpty()) 
             ? fromEmail 
             : ((sendGridFromEmail != null && !sendGridFromEmail.trim().isEmpty()) 
                 ? sendGridFromEmail 
-                : "onboarding@resend.dev");
-        this.emailEnabled = emailEnabled;
-        this.emailProvider = emailProvider != null ? emailProvider.toLowerCase() : "console";
-        this.resendApiKey = resendApiKey;
-        this.awsRegion = awsRegion;
-        this.awsAccessKeyId = awsAccessKeyId;
-        this.awsSecretAccessKey = awsSecretAccessKey;
+                : "IntelliLib <noreply@intellib.com>");
 
-        // Initialize Resend WebClient if API key is provided
-        if (resendApiKey != null && !resendApiKey.trim().isEmpty()) {
-            this.resendWebClient = WebClient.builder()
-                    .baseUrl("https://api.resend.com")
-                    .defaultHeader("Authorization", "Bearer " + resendApiKey)
-                    .defaultHeader("Content-Type", "application/json")
-                    .build();
+        // Initialize SendGrid client (PRIMARY) if API key is provided
+        if (sendGridApiKey != null && !sendGridApiKey.trim().isEmpty()) {
+            try {
+                this.sendGrid = new SendGrid(sendGridApiKey);
+            } catch (Exception e) {
+                System.err.println("Failed to initialize SendGrid client: " + e.getMessage());
+                e.printStackTrace();
+            }
         }
 
-        // Initialize SendGrid client if API key is provided (fallback)
-        if (sendGridApiKey != null && !sendGridApiKey.trim().isEmpty()) {
-            this.sendGrid = new SendGrid(sendGridApiKey);
+        // Initialize Mailgun client (FALLBACK) if API key and domain are provided
+        if (mailgunApiKey != null && !mailgunApiKey.trim().isEmpty() 
+            && mailgunDomain != null && !mailgunDomain.trim().isEmpty()) {
+            try {
+                this.mailgunMessagesApi = MailgunClient.config(mailgunApiKey)
+                    .createApi(MailgunMessagesApi.class);
+            } catch (Exception e) {
+                System.err.println("Failed to initialize Mailgun client: " + e.getMessage());
+                e.printStackTrace();
+            }
         }
     }
 
@@ -105,81 +104,59 @@ public class EmailService {
     }
 
     /**
-     * Send email using the configured provider
+     * Send password reset OTP email to user
+     */
+    public void sendPasswordResetOTPEmail(String toEmail, String otpCode, String userName) {
+        if (!emailEnabled) {
+            logOTP("PASSWORD RESET OTP (Development Mode)", toEmail, otpCode);
+            return;
+        }
+
+        String emailBody = buildPasswordResetOTPEmailBody(userName, otpCode);
+        String subject = "Your IntelliLib Password Reset Verification Code";
+
+        boolean sent = sendEmail(toEmail, subject, emailBody);
+
+        if (!sent) {
+            logOTP("PASSWORD RESET OTP (Email Send Failed)", toEmail, otpCode);
+        }
+    }
+
+    /**
+     * Send email using SendGrid (PRIMARY) with Mailgun (FALLBACK)
      */
     private boolean sendEmail(String toEmail, String subject, String body) {
-        switch (emailProvider) {
-            case "resend":
-                return sendEmailViaResend(toEmail, subject, body);
-            case "sendgrid":
-                return sendEmailViaSendGrid(toEmail, subject, body);
-            case "aws-ses":
-                return sendEmailViaAWSSES(toEmail, subject, body);
-            case "console":
-            default:
-                logOTP("EMAIL (Console Mode)", toEmail, extractOTPFromBody(body));
-                return false;
-        }
-    }
-
-    /**
-     * Send email via Resend API (Recommended for Railway)
-     */
-    private boolean sendEmailViaResend(String toEmail, String subject, String body) {
-        if (resendWebClient == null) {
-            System.err.println("Resend API key not configured. Falling back to console logging.");
+        if (!emailEnabled) {
+            logOTP("EMAIL (Disabled Mode)", toEmail, extractOTPFromBody(body));
             return false;
         }
 
-        try {
-            Map<String, Object> emailData = new HashMap<>();
-            emailData.put("from", "IntelliLib <" + fromEmail + ">");
-            emailData.put("to", new String[]{toEmail});
-            emailData.put("subject", subject);
-            emailData.put("text", body);
-
-            String response = resendWebClient.post()
-                    .uri("/emails")
-                    .bodyValue(emailData)
-                    .retrieve()
-                    .bodyToMono(String.class)
-                    .block();
-
-            System.out.println("========================================");
-            System.out.println("Resend API Response:");
-            System.out.println("Response: " + response);
-            System.out.println("========================================");
-
-            if (response != null && (response.contains("\"id\"") || response.contains("id"))) {
-                System.out.println("Email sent successfully via Resend to: " + toEmail);
+        // Try SendGrid first (PRIMARY)
+        if (sendGrid != null) {
+            boolean sent = sendEmailViaSendGrid(toEmail, subject, body);
+            if (sent) {
                 return true;
-            } else {
-                System.err.println("Failed to send email via Resend. Response: " + response);
-                // Try fallback to SendGrid if available
-                if (sendGrid != null) {
-                    System.out.println("Attempting fallback to SendGrid...");
-                    return sendEmailViaSendGrid(toEmail, subject, body);
-                }
-                return false;
             }
-        } catch (Exception e) {
-            System.err.println("Failed to send email via Resend: " + e.getMessage());
-            e.printStackTrace();
-            // Try fallback to SendGrid if available
-            if (sendGrid != null) {
-                System.out.println("Attempting fallback to SendGrid after Resend error...");
-                return sendEmailViaSendGrid(toEmail, subject, body);
-            }
-            return false;
+            // SendGrid failed, try Mailgun fallback
+            System.err.println("SendGrid failed, attempting Mailgun fallback...");
         }
+
+        // Try Mailgun as fallback
+        if (mailgunMessagesApi != null) {
+            return sendEmailViaMailgun(toEmail, subject, body);
+        }
+
+        // No email service configured
+        System.err.println("No email service configured. SendGrid and Mailgun are not available.");
+        logOTP("EMAIL (No Service Configured)", toEmail, extractOTPFromBody(body));
+        return false;
     }
 
     /**
-     * Send email via SendGrid API (Fallback)
+     * Send email via SendGrid API (PRIMARY)
      */
     private boolean sendEmailViaSendGrid(String toEmail, String subject, String body) {
         if (sendGrid == null) {
-            System.err.println("SendGrid API key not configured. Falling back to console logging.");
             return false;
         }
 
@@ -196,6 +173,9 @@ public class EmailService {
             request.setBody(mail.build());
 
             Response response = sendGrid.api(request);
+
+            System.out.println("Sending the maild id for send grid using "+from);
+            System.out.println("to:"+to);
 
             System.out.println("========================================");
             System.out.println("SendGrid API Response:");
@@ -215,48 +195,71 @@ public class EmailService {
             System.err.println("Failed to send email via SendGrid: " + e.getMessage());
             e.printStackTrace();
             return false;
+        } catch (Exception e) {
+            System.err.println("Failed to send email via SendGrid: " + e.getMessage());
+            e.printStackTrace();
+            return false;
         }
     }
 
     /**
-     * Send email via AWS SES (Fallback)
+     * Send email via Mailgun API (FALLBACK)
      */
-    private boolean sendEmailViaAWSSES(String toEmail, String subject, String body) {
-        if (awsAccessKeyId == null || awsAccessKeyId.trim().isEmpty() ||
-            awsSecretAccessKey == null || awsSecretAccessKey.trim().isEmpty()) {
-            System.err.println("AWS SES credentials not configured. Falling back to console logging.");
+    private boolean sendEmailViaMailgun(String toEmail, String subject, String body) {
+        if (mailgunMessagesApi == null) {
             return false;
         }
 
         try {
-            // AWS SES SDK implementation
-            software.amazon.awssdk.services.ses.SesClient sesClient = software.amazon.awssdk.services.ses.SesClient.builder()
-                    .region(software.amazon.awssdk.regions.Region.of(awsRegion))
-                    .credentialsProvider(() -> software.amazon.awssdk.auth.credentials.AwsBasicCredentials.create(
-                            awsAccessKeyId, awsSecretAccessKey))
+            // Ensure from email uses the Mailgun domain format
+            String fromAddress = fromEmail;
+            if (mailgunDomain != null && !mailgunDomain.trim().isEmpty()) {
+                // If fromEmail doesn't contain @mailgunDomain, fix it
+                if (!fromEmail.contains(mailgunDomain)) {
+                    // Extract display name if present, otherwise use default
+                    String displayName = "IntelliLib";
+                    if (fromEmail.contains("<") && fromEmail.contains(">")) {
+                        displayName = fromEmail.substring(0, fromEmail.indexOf("<")).trim();
+                        if (displayName.isEmpty()) {
+                            displayName = "IntelliLib";
+                        }
+                    }
+                    fromAddress = displayName + " <noreply@" + mailgunDomain + ">";
+                }
+            }
+
+            Message message = Message.builder()
+                    .from(fromAddress)
+                    .to(toEmail)
+                    .subject(subject)
+                    .text(body)
                     .build();
 
-            software.amazon.awssdk.services.ses.model.SendEmailRequest emailRequest = 
-                software.amazon.awssdk.services.ses.model.SendEmailRequest.builder()
-                    .source(fromEmail)
-                    .destination(d -> d.toAddresses(toEmail))
-                    .message(msg -> msg
-                        .subject(sub -> sub.data(subject))
-                        .body(b -> b.text(t -> t.data(body))))
-                    .build();
+            MessageResponse response = mailgunMessagesApi.sendMessage(mailgunDomain, message);
 
-            software.amazon.awssdk.services.ses.model.SendEmailResponse response = sesClient.sendEmail(emailRequest);
-
+            System.out.println("Sending from Mail gun using"+fromAddress);
+            System.out.println("to:"+toEmail);
             System.out.println("========================================");
-            System.out.println("AWS SES Response:");
-            System.out.println("Message ID: " + response.messageId());
+            System.out.println("Mailgun API Response (Fallback):");
+            System.out.println("Message ID: " + response.getId());
+            System.out.println("Message: " + response.getMessage());
             System.out.println("========================================");
 
-            System.out.println("Email sent successfully via AWS SES to: " + toEmail);
-            sesClient.close();
-            return true;
+            if (response.getId() != null && !response.getId().isEmpty()) {
+                System.out.println("Email sent successfully via Mailgun (fallback) to: " + toEmail);
+                return true;
+            } else {
+                System.err.println("Failed to send email via Mailgun. Response: " + response.getMessage());
+                return false;
+            }
+        } catch (FeignException e) {
+            String errorMessage = e.getMessage();
+            int statusCode = e.status();
+            System.err.println("Failed to send email via Mailgun (Status: " + statusCode + "): " + errorMessage);
+            e.printStackTrace();
+            return false;
         } catch (Exception e) {
-            System.err.println("Failed to send email via AWS SES: " + e.getMessage());
+            System.err.println("Failed to send email via Mailgun: " + e.getMessage());
             e.printStackTrace();
             return false;
         }
@@ -299,6 +302,24 @@ public class EmailService {
     }
 
     /**
+     * Build password reset OTP email body
+     */
+    private String buildPasswordResetOTPEmailBody(String userName, String otpCode) {
+        return String.format(
+            "Hello %s,\n\n" +
+            "You recently requested to reset your password for your IntelliLib account.\n\n" +
+            "Please use the following verification code to proceed with password reset:\n\n" +
+            "Password Reset Verification Code: %s\n\n" +
+            "This code will expire in 10 minutes.\n\n" +
+            "If you did not request a password reset, please ignore this email or contact support.\n\n" +
+            "Best regards,\n" +
+            "The IntelliLib Team",
+            userName != null ? userName : "there",
+            otpCode
+        );
+    }
+
+    /**
      * Extract OTP from email body for logging
      */
     private String extractOTPFromBody(String body) {
@@ -310,6 +331,11 @@ public class EmailService {
             return body.substring(start, end).trim();
         } else if (body.contains("Login Verification Code: ")) {
             int start = body.indexOf("Login Verification Code: ") + "Login Verification Code: ".length();
+            int end = body.indexOf("\n", start);
+            if (end == -1) end = body.length();
+            return body.substring(start, end).trim();
+        } else if (body.contains("Password Reset Verification Code: ")) {
+            int start = body.indexOf("Password Reset Verification Code: ") + "Password Reset Verification Code: ".length();
             int end = body.indexOf("\n", start);
             if (end == -1) end = body.length();
             return body.substring(start, end).trim();

@@ -22,34 +22,39 @@ public class SessionAuthenticationFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
         
-        HttpSession session = request.getSession(false);
+        String requestPath = request.getRequestURI();
         
-        if (session != null) {
-            Long userId = (Long) session.getAttribute("userId");
-            
-            if (userId != null) {
-                // User is authenticated via session
-                // Create authentication token for Spring Security
-                String userEmail = (String) session.getAttribute("userEmail");
-                String authProvider = (String) session.getAttribute("authProvider");
-                
-                // Get user role from session if available, otherwise default to USER
-                String role = (String) session.getAttribute("userRole");
-                if (role == null) {
-                    role = "USER"; // Default role
+        // Only process session for API requests (skip static resources)
+        if (requestPath.startsWith("/api/")) {
+            HttpSession session = request.getSession(false);
+
+            if (session != null) {
+                Long userId = (Long) session.getAttribute("userId");
+
+                if (userId != null) {
+                    // User is authenticated via session
+                    // Create authentication token for Spring Security
+                    String userEmail = (String) session.getAttribute("userEmail");
+                    String authProvider = (String) session.getAttribute("authProvider");
+
+                    // Get user role from session if available, otherwise default to USER
+                    String role = (String) session.getAttribute("userRole");
+                    if (role == null) {
+                        role = "USER"; // Default role
+                    }
+
+                    List<SimpleGrantedAuthority> authorities = Collections.singletonList(
+                        new SimpleGrantedAuthority("ROLE_" + role)
+                    );
+
+                    Authentication authentication = new UsernamePasswordAuthenticationToken(
+                        userEmail != null ? userEmail : userId.toString(),
+                        null,
+                        authorities
+                    );
+
+                    SecurityContextHolder.getContext().setAuthentication(authentication);
                 }
-                
-                List<SimpleGrantedAuthority> authorities = Collections.singletonList(
-                    new SimpleGrantedAuthority("ROLE_" + role)
-                );
-                
-                Authentication authentication = new UsernamePasswordAuthenticationToken(
-                    userEmail != null ? userEmail : userId.toString(),
-                    null,
-                    authorities
-                );
-                
-                SecurityContextHolder.getContext().setAuthentication(authentication);
             }
         }
         

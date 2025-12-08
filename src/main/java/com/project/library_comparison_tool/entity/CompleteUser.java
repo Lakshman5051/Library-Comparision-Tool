@@ -51,60 +51,21 @@ public class CompleteUser extends User {
 
 
         /**
-         * RELATIONSHIP 1: User → Projects (One-to-Many)
-         * One user can have multiple projects
-         */
-        @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
-        @Builder.Default
-        private Set<Project> projects = new HashSet<>();
-
-        /**
-         * RELATIONSHIP 2: User → Favorites (One-to-Many)
+         * RELATIONSHIP: User → Favorites (One-to-Many)
          * One user can favorite multiple libraries
          */
+        /* Uncomment when Favorite entity is implemented
         @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
         @Builder.Default
         private Set<Favorite> favorites = new HashSet<>();
-
-
-
-        /**
-         * Add a project to this user
-         */
-        public void addProject(Project project) {
-            projects.add(project);
-            project.setUser(this);
-        }
-
-        /**
-         * Remove a project from this user
-         */
-        public void removeProject(Project project) {
-            projects.remove(project);
-            project.setUser(null);
-        }
-
-        /**
-         * Get count of user's projects
-         */
-        public int getProjectCount() {
-            return projects.size();
-        }
-
-        /**
-         * Check if user owns a specific project
-         */
-        public boolean ownsProject(Project project) {
-            return projects.contains(project);
-        }
+        */
 
         // ============================================
         // HELPER METHODS FOR FAVORITES
         // ============================================
+        // Uncomment when Favorite entity is implemented
 
-        /**
-         * Add a library to favorites
-         */
+        /*
         public void addFavorite(Library library) {
             Favorite favorite = new Favorite();
             favorite.setUser(this);
@@ -112,27 +73,19 @@ public class CompleteUser extends User {
             favorites.add(favorite);
         }
 
-        /**
-         * Remove a library from favorites
-         */
         public void removeFavorite(Library library) {
             favorites.removeIf(f -> f.getLibrary().equals(library));
         }
 
-        /**
-         * Check if user has favorited a library
-         */
         public boolean hasFavorited(Library library) {
             return favorites.stream()
                     .anyMatch(f -> f.getLibrary().equals(library));
         }
 
-        /**
-         * Get count of user's favorites
-         */
         public int getFavoriteCount() {
             return favorites.size();
         }
+        */
 
         // ============================================
         // OTHER HELPER METHODS

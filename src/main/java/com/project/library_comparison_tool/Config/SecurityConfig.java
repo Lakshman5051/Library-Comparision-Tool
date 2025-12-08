@@ -1,18 +1,27 @@
 package com.project.library_comparison_tool.Config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.MediaType;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import java.io.IOException;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
 
 @Configuration
 @EnableWebSecurity
@@ -31,6 +40,11 @@ public class SecurityConfig {
                 // For production, consider enabling CSRF with proper token handling
                 .csrf(csrf -> csrf.disable())
 
+                // Configure exception handling - return 401 for unauthenticated requests
+                .exceptionHandling(exceptions -> exceptions
+                        .authenticationEntryPoint(customAuthenticationEntryPoint())
+                )
+
                 // Configure authorization rules
                 .authorizeHttpRequests(auth -> auth
                         // Public endpoints - no authentication required
@@ -38,6 +52,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/login").permitAll()
                         .requestMatchers("/api/auth/signup").permitAll()
                         .requestMatchers("/api/auth/forgot-password").permitAll()
+                        .requestMatchers("/api/auth/verify-password-reset-otp").permitAll()
+                        .requestMatchers("/api/auth/resend-password-reset-otp").permitAll()
                         .requestMatchers("/api/auth/reset-password").permitAll()
                         .requestMatchers("/api/auth/validate-reset-token").permitAll()
                         .requestMatchers("/api/auth/send-verification-otp").permitAll()
@@ -45,12 +61,12 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/resend-verification-otp").permitAll()
                         .requestMatchers("/api/auth/verify-login-otp").permitAll()
                         .requestMatchers("/api/auth/resend-login-otp").permitAll()
+                        .requestMatchers("/api/auth/check").permitAll() // Public - used to check auth status
                         // Protected endpoints - require authentication
                         .requestMatchers("/api/auth/change-email").authenticated()
                         .requestMatchers("/api/auth/change-password").authenticated()
                         .requestMatchers("/api/auth/me").authenticated()
                         .requestMatchers("/api/auth/logout").authenticated()
-                        .requestMatchers("/api/auth/check").authenticated()
                         .requestMatchers("/api/libraries/search**").permitAll()
                         .requestMatchers("/api/libraries").permitAll()
                         .requestMatchers("/api/libraries/{id}").permitAll()
@@ -136,5 +152,32 @@ public class SecurityConfig {
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
+    }
+
+    /**
+     * Custom authentication entry point that returns 401 Unauthorized
+     * with a JSON response for unauthenticated requests.
+     *
+     * @return AuthenticationEntryPoint
+     */
+    @Bean
+    public AuthenticationEntryPoint customAuthenticationEntryPoint() {
+        return new AuthenticationEntryPoint() {
+            @Override
+            public void commence(HttpServletRequest request, HttpServletResponse response,
+                                 AuthenticationException authException) throws IOException {
+                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+                response.setCharacterEncoding("UTF-8");
+
+                Map<String, Object> body = new HashMap<>();
+                body.put("success", false);
+                body.put("message", "Authentication required. Please log in.");
+                body.put("error", "UNAUTHORIZED");
+
+                ObjectMapper mapper = new ObjectMapper();
+                mapper.writeValue(response.getOutputStream(), body);
+            }
+        };
     }
 }

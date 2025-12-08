@@ -186,4 +186,35 @@ public class UserService {
         // Save to database
         return userRepository.save(user);
     }
+
+    /**
+     * Update an unverified user with new signup information.
+     * This allows users to retry signup if they didn't complete email verification.
+     * 
+     * @param user Existing unverified user
+     * @param signupRequest New signup data
+     * @return Updated user
+     */
+    @Transactional
+    public User updateUnverifiedUser(User user, SignupRequest signupRequest) {
+        // Update user information
+        user.setFirstName(signupRequest.getFirstName());
+        user.setLastName(signupRequest.getLastName());
+        
+        // Update password hash
+        String hashedPassword = passwordEncoder.encode(signupRequest.getPassword());
+        user.setPasswordHash(hashedPassword);
+        
+        // Ensure emailVerified is false
+        user.setEmailVerified(false);
+        
+        // Ensure auth provider is LOCAL
+        user.setAuthProvider(AuthProvider.LOCAL);
+        
+        // Update login timestamp
+        user.updateLastLogin();
+        
+        // Save to database
+        return userRepository.save(user);
+    }
 }

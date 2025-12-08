@@ -14,13 +14,14 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
 import java.security.GeneralSecurityException;
+import java.util.Optional;
 
 
 @Service
 public class AuthService {
 
     @Autowired
-    private GoogleOAuthService googleOAuthService;
+    private IGoogleOAuthService googleOAuthService;
 
     @Autowired
     private UserService userService;
@@ -114,7 +115,13 @@ public class AuthService {
      * @return true if user is logged in, false otherwise
      */
     public boolean isAuthenticated(HttpSession session) {
-        return session.getAttribute("userId") != null;
+        if (session == null) {
+            System.out.println("DEBUG: Session is null in isAuthenticated");
+            return false;
+        }
+        Long userId = (Long) session.getAttribute("userId");
+        System.out.println("DEBUG: isAuthenticated check - userId: " + userId);
+        return userId != null;
     }
 
     /**
@@ -207,10 +214,10 @@ public class AuthService {
                     .build();
         }
 
-        // Password is correct - return success indicating OTP is required
+        // Password is correct - login successful (no OTP required)
         return AuthResponse.builder()
                 .success(true)
-                .message("Password verified. Please enter the OTP sent to your email.")
+                .message("Login successful")
                 .email(user.getEmail())
                 .build();
     }
@@ -253,21 +260,35 @@ public class AuthService {
     @Transactional
     public AuthResponse signup(SignupRequest signupRequest, HttpSession session) {
         // Check if email already exists
-        if (userService.existsByEmail(signupRequest.getEmail())) {
-            return AuthResponse.builder()
-                    .success(false)
-                    .message("Email already registered")
-                    .build();
+        Optional<User> existingUserOpt = userService.findByEmail(signupRequest.getEmail());
+        
+        if (existingUserOpt.isPresent()) {
+            User existingUser = existingUserOpt.get();
+            
+            // If user exists and email is verified, reject signup
+            if (Boolean.TRUE.equals(existingUser.getEmailVerified())) {
+                return AuthResponse.builder()
+                        .success(false)
+                        .message("Email already registered and verified. Please login instead.")
+                        .build();
+            }
+            
+            // If user exists but email is NOT verified, update user info and allow resending OTP
+            // This handles the case where user signed up but didn't verify email
+            User updatedUser = userService.updateUnverifiedUser(existingUser, signupRequest);
+            
+            // Return success response - OTP will be sent by controller
+            return buildAuthResponse(updatedUser, true, "Account information updated. Please verify your email.");
         }
 
-        // Create new user (emailVerified will be false by default)
+        // Email doesn't exist - create new user (emailVerified will be false by default)
         User user = userService.createUserFromSignup(signupRequest);
 
         // Don't create session yet - user needs to verify email first
         // Session will be created after email verification in verifyEmail endpoint
 
         // Return response (without session)
-        return buildAuthResponse(user, true, "Account created successfully");
+        return buildAuthResponse(user, true, "Account created successfully. Please verify your email.");
     }
 
     /**
