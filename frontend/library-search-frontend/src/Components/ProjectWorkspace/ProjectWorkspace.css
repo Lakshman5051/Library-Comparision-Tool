@@ -1,8 +1,8 @@
 .project-workspace {
-  min-height: calc(100vh - 80px);
+  min-height: calc(100vh - 70px);
   padding: 2rem 1rem;
-  padding-top: 6rem; /* Add space for fixed header (80px header + 2rem extra) */
-  background: #f1f5f9;
+  padding-top: 5.5rem; /* Add space for fixed header (70px header + 2rem extra) */
+  background: var(--bg-secondary, #f1f5f9);
 }
 
 .workspace-container {
@@ -12,10 +12,10 @@
 
 .workspace-header {
   margin-bottom: 2rem;
-  background: white;
+  background: var(--bg-primary, white);
   padding: 1.5rem;
   border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 2px 8px var(--shadow-color, rgba(0, 0, 0, 0.04));
 }
 
 .workspace-header-content {
@@ -29,10 +29,10 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.5rem 1rem;
-  background: white;
-  border: 1px solid #e2e8f0;
+  background: var(--bg-primary, white);
+  border: 1px solid var(--border-color, #e2e8f0);
   border-radius: 8px;
-  color: #64748b;
+  color: var(--text-secondary, #64748b);
   font-size: 0.875rem;
   font-weight: 500;
   cursor: pointer;
@@ -41,15 +41,15 @@
 }
 
 .back-button:hover {
-  background: #f8fafc;
-  border-color: #cbd5e1;
-  color: #475569;
+  background: var(--bg-hover, #f8fafc);
+  border-color: var(--border-light, #cbd5e1);
+  color: var(--text-primary, #475569);
 }
 
 .workspace-title {
   font-size: 2.5rem;
   font-weight: 800;
-  color: #1e293b;
+  color: var(--text-primary, #1e293b);
   margin: 0;
   background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
   -webkit-background-clip: text;
@@ -59,7 +59,7 @@
 
 .workspace-subtitle {
   font-size: 1.125rem;
-  color: #64748b;
+  color: var(--text-secondary, #64748b);
   margin: 0;
   font-weight: 500;
 }
@@ -68,7 +68,7 @@
   display: flex;
   gap: 0.5rem;
   margin-bottom: 2rem;
-  border-bottom: 2px solid #e2e8f0;
+  border-bottom: 2px solid var(--border-color, #e2e8f0);
   padding-bottom: 0;
 }
 
@@ -80,7 +80,7 @@
   background: transparent;
   border: none;
   border-bottom: 3px solid transparent;
-  color: #64748b;
+  color: var(--text-secondary, #64748b);
   font-size: 0.9375rem;
   font-weight: 600;
   cursor: pointer;
@@ -90,7 +90,7 @@
 
 .tab-button:hover {
   color: #7c3aed;
-  background: #f8fafc;
+  background: var(--bg-hover, #f8fafc);
 }
 
 .tab-button.active {
@@ -100,7 +100,7 @@
 }
 
 .workspace-content {
-  background: white;
+  background: var(--bg-primary, white);
   border-radius: 16px;
   padding: 2rem;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);

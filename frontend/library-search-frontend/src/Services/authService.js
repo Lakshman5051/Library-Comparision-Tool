@@ -1,4 +1,5 @@
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080';
+// Use relative URLs to work with proxy (package.json proxy: http://localhost:8080)
+const API_URL = process.env.REACT_APP_API_URL || '';
 
 export const loginWithGoogle = async (idToken) => {
   try {

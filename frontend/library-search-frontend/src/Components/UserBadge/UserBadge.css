@@ -10,7 +10,7 @@
   padding: 0.5rem 0.75rem;
   background: transparent;
   border: none;
-  color: #1e293b;
+  color: var(--text-primary, #1e293b);
   font-size: 0.95rem;
   font-weight: 500;
   cursor: pointer;
@@ -19,7 +19,7 @@
 }
 
 .user-badge-trigger:hover {
-  background: #f1f5f9;
+  background: var(--bg-hover, #f1f5f9);
   color: #7c3aed;
 }
 
@@ -38,10 +38,10 @@
   position: absolute;
   top: calc(100% + 0.5rem);
   right: 0;
-  background: white;
+  background: var(--bg-primary, white);
   border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  border: 1px solid #e2e8f0;
+  box-shadow: 0 4px 12px var(--shadow-color, rgba(0, 0, 0, 0.15));
+  border: 1px solid var(--border-color, #e2e8f0);
   min-width: 180px;
   z-index: 1000;
   animation: dropdownFadeIn 0.2s ease-out;
@@ -67,7 +67,7 @@
   padding: 0.75rem 1rem;
   background: transparent;
   border: none;
-  color: #1e293b;
+  color: var(--text-primary, #1e293b);
   font-size: 0.9rem;
   font-weight: 500;
   cursor: pointer;
@@ -76,11 +76,11 @@
 }
 
 .dropdown-item:first-child {
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--border-color, #e2e8f0);
 }
 
 .dropdown-item:hover {
-  background: #f8fafc;
+  background: var(--bg-hover, #f8fafc);
   color: #7c3aed;
 }
 

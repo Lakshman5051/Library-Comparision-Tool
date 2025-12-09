@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import './ManageProject.css';
+import LibraryDetails from '../LibraryDetails/LibraryDetails';
 
 function ManageProject({ project, onBack, onNavigateToCatalog }) {
   const [activeTab, setActiveTab] = useState('overview');
@@ -9,6 +10,7 @@ function ManageProject({ project, onBack, onNavigateToCatalog }) {
   const [error, setError] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedLibraryDetails, setSelectedLibraryDetails] = useState(null);
   const [editForm, setEditForm] = useState({
     name: project.name,
     description: project.description || '',
@@ -216,16 +218,6 @@ function ManageProject({ project, onBack, onNavigateToCatalog }) {
           </svg>
           Libraries ({libraries.length})
         </button>
-        <button
-          className={`manage-tab ${activeTab === 'settings' ? 'active' : ''}`}
-          onClick={() => setActiveTab('settings')}
-        >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="12" cy="12" r="3"/>
-            <path d="M12 1v6m0 6v6m9-9h-6m-6 0H3"/>
-          </svg>
-          Settings
-        </button>
       </div>
 
       <div className="manage-project-content">
@@ -274,6 +266,7 @@ function ManageProject({ project, onBack, onNavigateToCatalog }) {
                 <button
                   className="action-button"
                   onClick={() => setIsEditing(true)}
+                  disabled={isEditing}
                 >
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
@@ -283,6 +276,88 @@ function ManageProject({ project, onBack, onNavigateToCatalog }) {
                 </button>
               </div>
             </div>
+
+            {isEditing && (
+              <div className="overview-section">
+                <h3>Edit Project</h3>
+                <form onSubmit={handleUpdateProject} className="edit-project-form">
+                  {error && (
+                    <div className="form-error">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <line x1="12" y1="8" x2="12" y2="12"/>
+                        <line x1="12" y1="16" x2="12.01" y2="16"/>
+                      </svg>
+                      {error}
+                    </div>
+                  )}
+
+                  <div className="form-group">
+                    <label htmlFor="edit-name">
+                      Project Name <span className="required">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      id="edit-name"
+                      value={editForm.name}
+                      onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                      required
+                      maxLength={200}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label htmlFor="edit-description">Description</label>
+                    <textarea
+                      id="edit-description"
+                      value={editForm.description}
+                      onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                      rows={4}
+                      maxLength={1000}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label htmlFor="edit-status">Status</label>
+                    <select
+                      id="edit-status"
+                      value={editForm.status}
+                      onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
+                    >
+                      <option value="PLANNING">Planning</option>
+                      <option value="ACTIVE">Active</option>
+                      <option value="ON_HOLD">On Hold</option>
+                      <option value="COMPLETED">Completed</option>
+                    </select>
+                  </div>
+
+                  <div className="form-actions">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsEditing(false);
+                        setEditForm({
+                          name: projectData.name,
+                          description: projectData.description || '',
+                          status: projectData.status
+                        });
+                      }}
+                      className="cancel-button"
+                      disabled={loading}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="submit-button"
+                      disabled={loading || !editForm.name.trim()}
+                    >
+                      {loading ? 'Saving...' : 'Save Changes'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
           </div>
         )}
 
@@ -377,6 +452,13 @@ function ManageProject({ project, onBack, onNavigateToCatalog }) {
                         </p>
                       </div>
                       <button
+                        onClick={() => setSelectedLibraryDetails(library)}
+                        className="view-details-button"
+                        title="View details"
+                      >
+                        View Details
+                      </button>
+                      <button
                         onClick={() => handleRemoveLibrary(library.id, library.name)}
                         className="remove-library-button"
                         title="Remove from project"
@@ -394,9 +476,17 @@ function ManageProject({ project, onBack, onNavigateToCatalog }) {
                       {library.packageManager && (
                         <span className="meta-tag">{library.packageManager}</span>
                       )}
+                      {library.latestVersion && (
+                        <span className="meta-tag">v{library.latestVersion}</span>
+                      )}
                       {library.githubStars && (
                         <span className="meta-tag">
                           ⭐ {library.githubStars.toLocaleString()}
+                        </span>
+                      )}
+                      {library.categories && (
+                        <span className="meta-tag">
+                          {library.categories}
                         </span>
                       )}
                     </div>
@@ -409,109 +499,14 @@ function ManageProject({ project, onBack, onNavigateToCatalog }) {
           </div>
         )}
 
-        {activeTab === 'settings' && (
-          <div className="settings-tab">
-            <h3>Edit Project</h3>
-
-            {!isEditing ? (
-              <div className="settings-view">
-                <div className="settings-item">
-                  <span className="settings-label">Project Name</span>
-                  <span className="settings-value">{projectData.name}</span>
-                </div>
-                <div className="settings-item">
-                  <span className="settings-label">Description</span>
-                  <span className="settings-value">{projectData.description || 'No description'}</span>
-                </div>
-                <div className="settings-item">
-                  <span className="settings-label">Status</span>
-                  <span className="settings-value">{getStatusLabel(projectData.status)}</span>
-                </div>
-                <button onClick={() => setIsEditing(true)} className="edit-settings-button">
-                  Edit Project Details
-                </button>
-              </div>
-            ) : (
-              <form onSubmit={handleUpdateProject} className="edit-project-form">
-                {error && (
-                  <div className="form-error">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <circle cx="12" cy="12" r="10"/>
-                      <line x1="12" y1="8" x2="12" y2="12"/>
-                      <line x1="12" y1="16" x2="12.01" y2="16"/>
-                    </svg>
-                    {error}
-                  </div>
-                )}
-
-                <div className="form-group">
-                  <label htmlFor="edit-name">
-                    Project Name <span className="required">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    id="edit-name"
-                    value={editForm.name}
-                    onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                    required
-                    maxLength={200}
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label htmlFor="edit-description">Description</label>
-                  <textarea
-                    id="edit-description"
-                    value={editForm.description}
-                    onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
-                    rows={4}
-                    maxLength={1000}
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label htmlFor="edit-status">Status</label>
-                  <select
-                    id="edit-status"
-                    value={editForm.status}
-                    onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
-                  >
-                    <option value="PLANNING">Planning</option>
-                    <option value="ACTIVE">Active</option>
-                    <option value="ON_HOLD">On Hold</option>
-                    <option value="COMPLETED">Completed</option>
-                  </select>
-                </div>
-
-                <div className="form-actions">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsEditing(false);
-                      setEditForm({
-                        name: projectData.name,
-                        description: projectData.description || '',
-                        status: projectData.status
-                      });
-                    }}
-                    className="cancel-button"
-                    disabled={loading}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="submit-button"
-                    disabled={loading || !editForm.name.trim()}
-                  >
-                    {loading ? 'Saving...' : 'Save Changes'}
-                  </button>
-                </div>
-              </form>
-            )}
-          </div>
-        )}
       </div>
+
+      {selectedLibraryDetails && (
+        <LibraryDetails
+          library={selectedLibraryDetails}
+          onClose={() => setSelectedLibraryDetails(null)}
+        />
+      )}
     </div>
   );
 }

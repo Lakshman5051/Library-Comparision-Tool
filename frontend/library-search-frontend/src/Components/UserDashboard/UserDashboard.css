@@ -1,10 +1,10 @@
 .user-dashboard {
-  min-height: calc(100vh - 80px);
+  min-height: calc(100vh - 70px);
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 2rem 1rem;
-  background: #f1f5f9;
+  background: var(--bg-secondary, #f1f5f9);
 }
 
 .dashboard-container {
@@ -20,7 +20,7 @@
 .dashboard-title {
   font-size: 2.5rem;
   font-weight: 800;
-  color: #1e293b;
+  color: var(--text-primary, #1e293b);
   margin: 0 0 0.75rem 0;
   background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
   -webkit-background-clip: text;
@@ -30,7 +30,7 @@
 
 .dashboard-subtitle {
   font-size: 1.125rem;
-  color: #64748b;
+  color: var(--text-secondary, #64748b);
   margin: 0;
   font-weight: 500;
 }
@@ -43,8 +43,8 @@
 }
 
 .dashboard-card {
-  background: white;
-  border: 2px solid #e2e8f0;
+  background: var(--bg-primary, white);
+  border: 2px solid var(--border-color, #e2e8f0);
   border-radius: 16px;
   padding: 2.5rem;
   cursor: pointer;
@@ -54,7 +54,7 @@
   flex-direction: column;
   align-items: center;
   gap: 1.5rem;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 2px 8px var(--shadow-color, rgba(0, 0, 0, 0.06));
 }
 
 .dashboard-card:hover {
@@ -88,7 +88,7 @@
 .dashboard-card-title {
   font-size: 1.5rem;
   font-weight: 700;
-  color: #1e293b;
+  color: var(--text-primary, #1e293b);
   margin: 0;
 }
 

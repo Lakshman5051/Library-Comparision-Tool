@@ -1,5 +1,6 @@
-import React, { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
+import React, { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
 import './ProjectList.css';
+import { authenticatedFetch } from '../../utils/apiClient';
 
 const ProjectList = forwardRef(({ onManageProject, onCreateProject }, ref) => {
   const [projects, setProjects] = useState([]);
@@ -7,16 +8,19 @@ const ProjectList = forwardRef(({ onManageProject, onCreateProject }, ref) => {
   const [error, setError] = useState(null);
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [sortBy, setSortBy] = useState('date'); // 'date', 'name', 'libraries'
-  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080';
+  // Use relative URL to work with proxy (package.json proxy: http://localhost:8080)
+  // const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080';
+
+  const hasFetchedRef = useRef(false); // prevent double fetch in React.StrictMode (dev)
 
   const fetchProjects = async () => {
     setLoading(true);
     setError(null);
+    console.log('Fetching projects...');
 
     try {
-      const response = await fetch(`${API_URL}/api/projects`, {
+      const response = await authenticatedFetch('/api/projects', {
         method: 'GET',
-        credentials: 'include',
       });
 
       const data = await response.json();
@@ -39,6 +43,9 @@ const ProjectList = forwardRef(({ onManageProject, onCreateProject }, ref) => {
   };
 
   useEffect(() => {
+    // Guard against React.StrictMode double-invoking effects in development
+    if (hasFetchedRef.current) return;
+    hasFetchedRef.current = true;
     fetchProjects();
   }, []);
 
@@ -53,9 +60,8 @@ const ProjectList = forwardRef(({ onManageProject, onCreateProject }, ref) => {
     }
 
     try {
-      const response = await fetch(`${API_URL}/api/projects/${projectId}`, {
+      const response = await authenticatedFetch(`/api/projects/${projectId}`, {
         method: 'DELETE',
-        credentials: 'include',
       });
 
       const data = await response.json();
@@ -177,12 +183,7 @@ const ProjectList = forwardRef(({ onManageProject, onCreateProject }, ref) => {
             </span>
           )}
         </div>
-        <button onClick={onCreateProject} className="create-project-button">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M12 5v14M5 12h14"/>
-          </svg>
-          New Project
-        </button>
+        {/* Removed 'New Project' button as per request */}
       </div>
 
       {/* Filter and Sort Controls */}

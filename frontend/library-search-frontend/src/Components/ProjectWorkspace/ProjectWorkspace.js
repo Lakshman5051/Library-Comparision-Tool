@@ -1,13 +1,18 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import './ProjectWorkspace.css';
 import CreateProject from './CreateProject';
 import ProjectList from './ProjectList';
 import ManageProject from './ManageProject';
 
-function ProjectWorkspace({ onBack, onNavigateToCatalog }) {
-  const [currentView, setCurrentView] = useState('list'); // 'list', 'create', 'manage'
+function ProjectWorkspace({ onBack, onNavigateToCatalog, initialView = 'list', pendingLibrary = null, onLibraryAttached }) {
+  const [currentView, setCurrentView] = useState(initialView); // 'list', 'create', 'manage'
   const [selectedProject, setSelectedProject] = useState(null);
   const projectListRef = useRef(null);
+  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080';
+
+  useEffect(() => {
+    setCurrentView(initialView);
+  }, [initialView]);
 
   const handleCreateProject = () => {
     setCurrentView('create');
@@ -27,11 +32,35 @@ function ProjectWorkspace({ onBack, onNavigateToCatalog }) {
     setCurrentView('manage');
   };
 
-  const handleProjectCreated = (project) => {
+  const handleProjectCreated = async (project) => {
     setCurrentView('list');
     // Refresh project list after creation
     if (projectListRef.current && projectListRef.current.refresh) {
       projectListRef.current.refresh();
+    }
+
+    // If a library was waiting to be attached, add it now
+    if (pendingLibrary && pendingLibrary.id) {
+      try {
+        const response = await fetch(`${API_URL}/api/projects/${project.id}/libraries`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ libraryId: pendingLibrary.id })
+        });
+
+        const data = await response.json();
+        if (!response.ok || !data.success) {
+          throw new Error(data.message || 'Failed to add library to the new project');
+        }
+
+        alert(`Added "${pendingLibrary.name}" to "${project.name}"`);
+        if (onLibraryAttached) {
+          onLibraryAttached();
+        }
+      } catch (err) {
+        alert(err.message || 'Could not add library to the new project.');
+      }
     }
   };
 
