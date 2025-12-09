@@ -1,3 +1,54 @@
+/* Ensure library card title row uses flex for proper alignment */
+/*
+.library-card-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Style for the always-visible Add to Project button */
+/*.add-to-project-btn {
+  background: #6c63ff;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  padding: 6px 14px;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: background 0.2s;
+  margin-left: auto;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+.add-to-project-btn:hover {
+  background: #554fd8;
+}*/
+/* Left-align the search bar container */
+.search-bar-container.left-align {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  position: relative;
+  width: 100%;
+}
+
+/* Input with space for icon */
+.search-input.with-icon {
+  padding-right: 36px;
+  width: 400px;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+  padding: 8px;
+}
+
+/* Icon inside input, right aligned */
+.search-icon-inside {
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  color: #888;
+}
 /* ============================================ */
 /* GLOBAL STYLES */
 /* ============================================ */

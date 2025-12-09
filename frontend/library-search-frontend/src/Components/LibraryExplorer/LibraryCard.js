@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState } from 'react';
+import AddToProjectModal from '../ProjectWorkspace/AddToProjectModal';
 
 function formatStars(stars) {
   if (!stars && stars !== 0) return 'N/A';
@@ -8,6 +9,12 @@ function formatStars(stars) {
 }
 
 function LibraryCard({ library, onClick, onToggleCompare, isSelectedForCompare }) {
+  const [showAddToProject, setShowAddToProject] = useState(false);
+
+  const handleAddSuccess = (projectId) => {
+    alert(`Successfully added "${library.name}" to project!`);
+  };
+
   return (
     <div className={`library-card ${isSelectedForCompare ? 'selected' : ''}`}>
       {/* Header Section */}
@@ -17,6 +24,14 @@ function LibraryCard({ library, onClick, onToggleCompare, isSelectedForCompare }
           {library.latestVersion && (
             <span className="library-card-version-badge">v{library.latestVersion}</span>
           )}
+          {/*<button
+            className="add-to-project-btn"
+            onClick={() => setShowAddToProject(true)}
+            title="Add this library to a project"
+            style={{ marginLeft: 'auto' }}
+          >
+            + Add to Project
+          </button>*/}
         </div>
         <div className="library-card-meta-row">
           {library.lastRegistryReleaseDate && (
@@ -51,6 +66,13 @@ function LibraryCard({ library, onClick, onToggleCompare, isSelectedForCompare }
       
       {/* Key Attributes - Two Columns */}
       <div className="library-card-attributes">
+        {showAddToProject && (
+          <AddToProjectModal
+            library={library}
+            onClose={() => setShowAddToProject(false)}
+            onAddSuccess={handleAddSuccess}
+          />
+        )}
         <div className="library-card-attributes-left">
           {library.categories && (
             <div className="library-card-attribute-item">
@@ -109,6 +131,20 @@ function LibraryCard({ library, onClick, onToggleCompare, isSelectedForCompare }
       {/* Action Button */}
       <div className="library-card-actions">
         <button
+          className="btn-add-to-project"
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowAddToProject(true);
+          }}
+          title="Add to Project"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M12 5v14M5 12h14"/>
+          </svg>
+          Add to Project
+        </button>
+        <button
           className="btn-primary"
           type="button"
           onClick={(e) => {
@@ -134,6 +170,14 @@ function LibraryCard({ library, onClick, onToggleCompare, isSelectedForCompare }
           </svg>
         </button>
       </div>
+
+      {/* Add to Project Modal */}
+      <AddToProjectModal
+        isOpen={showAddToProject}
+        onClose={() => setShowAddToProject(false)}
+        library={library}
+        onSuccess={handleAddSuccess}
+      />
     </div>
   );
 }

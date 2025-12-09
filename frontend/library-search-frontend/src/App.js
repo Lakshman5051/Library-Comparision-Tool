@@ -408,6 +408,7 @@ const [excludeSecurityIssues, setExcludeSecurityIssues] = useState(false);
 
   const handleBackToDashboard = () => {
     setShowProjectWorkspace(false);
+    setShowLibrarySearch(false); // Ensure library search is also hidden
     setShowDashboard(true);
   };
 
@@ -995,7 +996,7 @@ const handleAdvancedSearch = async () => {
             onAccountSettings={() => setShowAccountManagement(true)} 
           />
         </Header>
-        <ProjectWorkspace onBack={handleBackToDashboard} />
+        <ProjectWorkspace onBack={handleBackToDashboard} onNavigateToCatalog={handleDashboardSearchLibraries} />
         <Footer 
           onHome={handleGoHome}
           onAboutUs={handleShowAboutUs}

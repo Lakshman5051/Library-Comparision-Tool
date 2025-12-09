@@ -5,8 +5,7 @@ function CreateProject({ onProjectCreated, onCancel }) {
   const [formData, setFormData] = useState({
     name: '',
     description: '',
-    status: 'PLANNING',
-    isPublic: false
+    status: 'PLANNING'
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState(null);

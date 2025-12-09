@@ -4,7 +4,7 @@ import CreateProject from './CreateProject';
 import ProjectList from './ProjectList';
 import ManageProject from './ManageProject';
 
-function ProjectWorkspace({ onBack }) {
+function ProjectWorkspace({ onBack, onNavigateToCatalog }) {
   const [currentView, setCurrentView] = useState('list'); // 'list', 'create', 'manage'
   const [selectedProject, setSelectedProject] = useState(null);
   const projectListRef = useRef(null);
@@ -116,6 +116,7 @@ function ProjectWorkspace({ onBack }) {
             <ManageProject
               project={selectedProject}
               onBack={handleViewProjects}
+              onNavigateToCatalog={onNavigateToCatalog} // Pass the prop down
             />
           )}
         </div>
