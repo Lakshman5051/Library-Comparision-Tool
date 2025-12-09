@@ -14,8 +14,6 @@ function LibraryList({ libraries, onSelect, onToggleCompare, compareList }) {
           key={lib.id}
           library={lib}
           onClick={() => onSelect(lib)}
-          onToggleCompare={() => onToggleCompare(lib)}
-          isSelectedForCompare={!!compareList.find((x) => x.id === lib.id)}
         />
       ))}
     </div>

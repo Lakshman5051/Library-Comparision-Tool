@@ -1,6 +1,6 @@
 .landing-page {
   width: 100%;
-  background: #ffffff;
+  background: var(--bg-primary, #ffffff);
   min-height: 100vh;
 }
 
@@ -9,7 +9,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  background: var(--bg-secondary, linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%));
   padding: 8rem 2rem 4rem 2rem;
   position: relative;
   overflow: hidden;
@@ -180,7 +180,7 @@
 }
 
 .btn-secondary {
-  background: white;
+  background: var(--bg-primary, white);
   color: #7c3aed;
   border: 2px solid #7c3aed;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
@@ -235,7 +235,7 @@
   text-align: center;
   padding: 1.5rem;
   border-radius: 16px;
-  background: white;
+  background: var(--bg-primary, white);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
   transition: transform 0.3s ease, box-shadow 0.3s ease;
   border: 1px solid rgba(124, 58, 237, 0.1);
@@ -269,7 +269,7 @@
 
 .features-section {
   padding: 6rem 2rem;
-  background: white;
+  background: var(--bg-primary, white);
 }
 
 .features-header {
@@ -318,7 +318,7 @@
 }
 
 .feature-card {
-  background: white;
+  background: var(--bg-primary, white);
   border: 1px solid #e2e8f0;
   border-radius: 16px;
   padding: 2.5rem;
@@ -347,7 +347,7 @@
 .feature-title {
   font-size: 1.3rem;
   font-weight: 700;
-  color: #1e293b;
+  color: var(--text-primary, #1e293b);
   margin: 0 0 0.75rem 0;
 }
 
@@ -362,7 +362,7 @@
 
 .cta-section {
   padding: 5rem 2rem;
-  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  background: var(--bg-secondary, linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%));
   position: relative;
   overflow: hidden;
   border-top: 1px solid #e2e8f0;
@@ -387,7 +387,7 @@
   position: relative;
   z-index: 1;
   padding: 3rem;
-  background: white;
+  background: var(--bg-primary, white);
   border-radius: 24px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
   border: 1px solid #e2e8f0;
@@ -423,6 +423,188 @@
   box-shadow: 0 8px 24px rgba(124, 58, 237, 0.4);
 }
 
+/* Mentors Section */
+.mentors-section {
+  padding: 6rem 2rem;
+  background: var(--bg-secondary, linear-gradient(135deg, #fefefe 0%, #f8f9fa 100%));
+  position: relative;
+}
+
+[data-theme="dark"] .mentors-section {
+  background: var(--bg-secondary, #0f172a);
+}
+
+.mentors-header {
+  max-width: 800px;
+  margin: 0 auto 4rem auto;
+  text-align: center;
+}
+
+.mentors-title {
+  font-size: 2.75rem;
+  font-weight: 800;
+  color: var(--text-primary, #0f172a);
+  margin: 1rem 0 1.25rem 0;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.mentors-description {
+  font-size: 1.15rem;
+  color: var(--text-secondary, #64748b);
+  line-height: 1.7;
+  margin: 0;
+  font-weight: 400;
+}
+
+.mentors-grid {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 2.5rem;
+  padding: 0 1rem;
+}
+
+.mentor-card {
+  background: var(--bg-primary, white);
+  border-radius: 20px;
+  padding: 2.5rem 2rem;
+  text-align: center;
+  box-shadow: 0 4px 16px var(--shadow-color, rgba(0, 0, 0, 0.06));
+  transition: all 0.3s ease;
+  border: 1px solid rgba(124, 58, 237, 0.08);
+  position: relative;
+  overflow: hidden;
+}
+
+.mentor-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #7c3aed 0%, #a78bfa 100%);
+  transform: scaleX(0);
+  transition: transform 0.3s ease;
+}
+
+.mentor-card:hover::before {
+  transform: scaleX(1);
+}
+
+.mentor-card:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 12px 32px rgba(124, 58, 237, 0.15);
+  border-color: rgba(124, 58, 237, 0.2);
+}
+
+.mentor-avatar {
+  width: 120px;
+  height: 120px;
+  margin: 0 auto 1.5rem auto;
+  position: relative;
+}
+
+.avatar-placeholder {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #f0e7ff 0%, #e9d5ff 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #7c3aed;
+  box-shadow: 0 4px 12px rgba(124, 58, 237, 0.15);
+  transition: all 0.3s ease;
+}
+
+[data-theme="dark"] .avatar-placeholder {
+  background: linear-gradient(135deg, #312e81 0%, #1e1b4b 100%);
+}
+
+.mentor-card:hover .avatar-placeholder {
+  transform: scale(1.05);
+  box-shadow: 0 6px 20px rgba(124, 58, 237, 0.25);
+}
+
+/* If you want to add actual images later, use this: */
+.mentor-avatar img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid white;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.mentor-name {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-primary, #0f172a);
+  margin: 0 0 0.5rem 0;
+  letter-spacing: -0.01em;
+}
+
+.mentor-role {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #7c3aed;
+  margin: 0 0 1rem 0;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 0.85rem;
+}
+
+.mentor-bio {
+  font-size: 0.95rem;
+  color: var(--text-secondary, #64748b);
+  line-height: 1.6;
+  margin: 0 0 1.5rem 0;
+  min-height: 3.2rem;
+}
+
+.mentor-contact {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  align-items: center;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-color, #e2e8f0);
+}
+
+.contact-link {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: var(--bg-tertiary, #f8fafc);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary, #64748b);
+  transition: all 0.2s ease;
+  text-decoration: none;
+  border: 1px solid transparent;
+}
+
+[data-theme="dark"] .contact-link {
+  background: var(--bg-tertiary, #334155);
+}
+
+.contact-link:hover {
+  background: #7c3aed;
+  color: white;
+  border-color: #7c3aed;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3);
+}
+
+.contact-link svg {
+  width: 20px;
+  height: 20px;
+}
+
 
 
 @media (max-width: 1024px) {
@@ -437,6 +619,15 @@
 
   .features-grid {
     grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  }
+
+  .mentors-grid {
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 2rem;
+  }
+
+  .mentors-title {
+    font-size: 2.25rem;
   }
 }
 
@@ -487,6 +678,19 @@
   }
 
   .cta-title {
+    font-size: 2rem;
+  }
+
+  .mentors-section {
+    padding: 4rem 1.5rem;
+  }
+
+  .mentors-grid {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+
+  .mentors-title {
     font-size: 2rem;
   }
 }

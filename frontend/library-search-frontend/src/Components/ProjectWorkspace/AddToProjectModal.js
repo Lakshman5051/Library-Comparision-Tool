@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import './AddToProjectModal.css';
 
-function AddToProjectModal({ isOpen, onClose, library, onSuccess }) {
+function AddToProjectModal({ isOpen, onClose, library, onSuccess, onCreateProject }) {
   const [projects, setProjects] = useState([]);
   const [selectedProjectId, setSelectedProjectId] = useState('');
   const [loading, setLoading] = useState(false);
@@ -83,6 +83,15 @@ function AddToProjectModal({ isOpen, onClose, library, onSuccess }) {
     }
   };
 
+  const handleCreateProjectClick = () => {
+    if (onCreateProject) {
+      if (onClose) {
+        onClose();
+      }
+      onCreateProject();
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -120,6 +129,20 @@ function AddToProjectModal({ isOpen, onClose, library, onSuccess }) {
             <div>
               <h4>{library.name}</h4>
               <p>{library.description || 'No description available'}</p>
+              <div className="library-meta-row">
+                {library.githubStars !== undefined && (
+                  <span className="meta-chip">⭐ {Number(library.githubStars || 0).toLocaleString()} stars</span>
+                )}
+                {library.latestVersion && (
+                  <span className="meta-chip">v{library.latestVersion}</span>
+                )}
+                {library.categories && (
+                  <span className="meta-chip">{library.categories}</span>
+                )}
+                {library.packageManager && (
+                  <span className="meta-chip">{library.packageManager}</span>
+                )}
+              </div>
             </div>
           </div>
 
@@ -130,8 +153,17 @@ function AddToProjectModal({ isOpen, onClose, library, onSuccess }) {
             </div>
           ) : projects.length === 0 ? (
             <div className="modal-empty">
-              <p>You don't have any projects yet.</p>
-              <p className="modal-hint">Create a project first to add libraries to it.</p>
+              <p>No projects available yet.</p>
+              <p className="modal-hint">Create a project to add this library.</p>
+              {onCreateProject && (
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={handleCreateProjectClick}
+                >
+                  Create New Project
+                </button>
+              )}
             </div>
           ) : (
             <div className="form-group">

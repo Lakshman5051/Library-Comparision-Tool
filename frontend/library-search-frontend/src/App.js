@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import './App.css';
 import { GoogleOAuthProvider } from '@react-oauth/google';
+import { ROUTES } from './routes';
 
 // Components
 import Header from './Components/Header/Header';
@@ -18,22 +20,44 @@ import WelcomeOnboarding from './Components/WelcomeOnboarding/WelcomeOnboarding'
 import UserDashboard from './Components/UserDashboard/UserDashboard';
 import ProjectWorkspace from './Components/ProjectWorkspace/ProjectWorkspace';
 import AccountManagement from './Components/AccountManagement/AccountManagement';
+import AddToProjectModal from './Components/ProjectWorkspace/AddToProjectModal';
+import FavoritesView from './Components/FavoritesView/FavoritesView';
+import Pagination from './Components/Pagination/Pagination';
+import { addFavorite, removeFavorite, checkIfFavorited } from './Services/favoriteService';
 
 // Services
 import { logout, getCurrentUser } from './Services/authService';
 
-// Library Card Component with Version Badge Positioning
-function LibraryCard({ 
-  library, 
-  checkboxSelectedLibraries,
-  favoriteLibraries,
-  onCheckboxToggle,
-  onToggleFavorite,
-  onViewDetails
+// Library Card Component with Version Badge Positioning and Favorites
+function LibraryCard({
+  library,
+  onViewDetails,
+  onAddExistingProject,
+  onAddNewProject,
+  onToggleCompare,
+  isCompared
 }) {
   const titleRowRef = useRef(null);
   const versionInlineRef = useRef(null);
   const [showMetaVersion, setShowMetaVersion] = useState(false);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [isFavorited, setIsFavorited] = useState(null);
+  const [favoriteLoading, setFavoriteLoading] = useState(false);
+
+  // Check favorite status on mount
+  useEffect(() => {
+    if (library.id) {
+      checkIfFavorited(library.id)
+        .then((data) => {
+          if (data.success) {
+            setIsFavorited(data.isFavorited);
+          }
+        })
+        .catch((err) => {
+          console.error('Error checking favorite status:', err);
+        });
+    }
+  }, [library.id]);
 
   useEffect(() => {
     const checkWrapping = () => {
@@ -88,6 +112,29 @@ function LibraryCard({
     };
   }, [library.latestVersion, library.name]);
 
+  const handleToggleFavorite = async (e) => {
+    e.stopPropagation();
+    setFavoriteLoading(true);
+
+    try {
+      if (isFavorited) {
+        const data = await removeFavorite(library.id);
+        if (data.success) {
+          setIsFavorited(false);
+        }
+      } else {
+        const data = await addFavorite(library.id);
+        if (data.success) {
+          setIsFavorited(true);
+        }
+      }
+    } catch (err) {
+      alert(err.message || 'Failed to update favorite');
+    } finally {
+      setFavoriteLoading(false);
+    }
+  };
+
   return (
     <div className="library-card">
       {/* Header Section */}
@@ -102,39 +149,6 @@ function LibraryCard({
               v{library.latestVersion}
             </span>
           )}
-        </div>
-        {/* Checkbox and Favorite Icons */}
-        <div className="library-card-actions-top">
-          <button
-            className="library-card-checkbox-btn"
-            onClick={(e) => onCheckboxToggle(library, e)}
-            title="Select library"
-          >
-            <input
-              type="checkbox"
-              checked={checkboxSelectedLibraries.find(lib => lib.id === library.id) !== undefined}
-              onChange={() => {}}
-              className="library-card-checkbox"
-            />
-          </button>
-          <button
-            className="library-card-favorite-btn"
-            onClick={(e) => onToggleFavorite(library, e)}
-            title={favoriteLibraries.find(lib => lib.id === library.id) ? "Remove from favorites" : "Add to favorites"}
-          >
-            <svg 
-              width="20" 
-              height="20" 
-              viewBox="0 0 24 24" 
-              fill={favoriteLibraries.find(lib => lib.id === library.id) ? "#ef4444" : "none"} 
-              stroke={favoriteLibraries.find(lib => lib.id === library.id) ? "#ef4444" : "currentColor"} 
-              strokeWidth="2" 
-              strokeLinecap="round" 
-              strokeLinejoin="round"
-            >
-              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
-            </svg>
-          </button>
         </div>
         <div className="library-card-meta-row">
           {library.lastRegistryReleaseDate && (
@@ -227,26 +241,122 @@ function LibraryCard({
         </div>
       )}
       
-      {/* View Details Link */}
-      <button
-        className="view-details-link"
-        onClick={(e) => onViewDetails(library, e)}
-      >
-        View Details
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M7 17L17 7M7 7h10v10"/>
-        </svg>
-      </button>
+      {/* Actions row */}
+      <div className="library-card-actions-row" style={{ display: 'flex', gap: '12px', alignItems: 'center', marginTop: '16px', flexWrap: 'wrap' }}>
+        <button
+          className="view-details-link"
+          onClick={(e) => onViewDetails(library, e)}
+        >
+          View Details
+        </button>
+        <div className="add-to-project-inline" style={{ position: 'relative' }}>
+          <button
+            className="view-details-link"
+            onClick={() => setDropdownOpen((open) => !open)}
+            title="Add this library to a project"
+          >
+            Add to Project
+          </button>
+          {dropdownOpen && (
+            <div
+              className="add-to-project-menu add-to-project-menu--inline"
+              style={{
+                position: 'absolute',
+                top: '110%',
+                left: 0,
+                background: '#fff',
+                border: '1px solid #e5e7eb',
+                borderRadius: '8px',
+                boxShadow: '0 6px 18px rgba(0,0,0,0.12)',
+                minWidth: '220px',
+                zIndex: 10,
+                overflow: 'hidden'
+              }}
+            >
+              <button
+                className="add-to-project-menu-item"
+                style={{ width: '100%', padding: '10px 14px', textAlign: 'left', border: 'none', background: 'transparent', cursor: 'pointer' }}
+                onClick={() => { setDropdownOpen(false); onAddExistingProject(library); }}
+              >
+                Add to Existing Project
+              </button>
+              <button
+                className="add-to-project-menu-item"
+                style={{ width: '100%', padding: '10px 14px', textAlign: 'left', border: 'none', background: 'transparent', cursor: 'pointer' }}
+                onClick={() => { setDropdownOpen(false); onAddNewProject(library); }}
+              >
+                Add to New Project
+              </button>
+            </div>
+          )}
+        </div>
+        <button
+          className="view-details-link"
+          onClick={() => onToggleCompare(library)}
+        >
+          {isCompared ? 'Remove from Compare' : 'Add to Compare'}
+        </button>
+        <button
+          className="view-details-link"
+          onClick={handleToggleFavorite}
+          disabled={favoriteLoading}
+          title={isFavorited ? 'Remove from favorites' : 'Add to favorites'}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            opacity: favoriteLoading ? 0.6 : 1,
+            cursor: favoriteLoading ? 'not-allowed' : 'pointer'
+          }}
+        >
+          {favoriteLoading ? (
+            <>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="10" opacity="0.25"/>
+                <path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round">
+                  <animateTransform
+                    attributeName="transform"
+                    type="rotate"
+                    from="0 12 12"
+                    to="360 12 12"
+                    dur="1s"
+                    repeatCount="indefinite"
+                  />
+                </path>
+              </svg>
+              Loading...
+            </>
+          ) : (
+            <>
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill={isFavorited ? '#e74c3c' : 'none'}
+                stroke={isFavorited ? '#e74c3c' : 'currentColor'}
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+              </svg>
+              {isFavorited ? 'Remove from Favorites' : 'Add to Favorites'}
+            </>
+          )}
+        </button>
+      </div>
     </div>
   );
 }
 
 function App() {
 
-  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080';
+  const navigate = useNavigate();
+  const location = useLocation();
+  const API_URL = process.env.REACT_APP_API_URL || '';
 
   // state management
-  
+
   // Authentication State
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
@@ -257,24 +367,28 @@ function App() {
   const [showLibrarySearch, setShowLibrarySearch] = useState(false);
   const [showAccountManagement, setShowAccountManagement] = useState(false);
   const [showProjectWorkspace, setShowProjectWorkspace] = useState(false);
+  const [showFavoritesView, setShowFavoritesView] = useState(false);
   
   // Core Data State
   const [libraries, setLibraries] = useState([]);
+  const [allLibraries, setAllLibraries] = useState([]); // All libraries for filter options
   const [selectedLibraries, setSelectedLibraries] = useState([]);
-  const [comparisonCategory, setComparisonCategory] = useState(null); // Track category for comparison
   const [showComparisonView, setShowComparisonView] = useState(false);
-  
-  // Checkbox Selection State (for Add to Project / Compare actions)
-  const [checkboxSelectedLibraries, setCheckboxSelectedLibraries] = useState([]);
-  
-  // Favorites State
-  const [favoriteLibraries, setFavoriteLibraries] = useState([]);
+  const [comparisonCategory, setComparisonCategory] = useState('');
+  const [compareSelection, setCompareSelection] = useState([]);
 
   // Detail View State
   const [selectedLibraryForDetails, setSelectedLibraryForDetails] = useState(null);
+  const [libraryForProjectModal, setLibraryForProjectModal] = useState(null);
+  const [showAddToProjectModal, setShowAddToProjectModal] = useState(false);
+  const [pendingLibraryForNewProject, setPendingLibraryForNewProject] = useState(null);
+  const [workspaceInitialView, setWorkspaceInitialView] = useState('list'); // 'list' | 'create'
   
   // Search & Filter State
   const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchMode, setIsSearchMode] = useState(false); // Track if we're in search mode (using API search)
+  const [isFilterMode, setIsFilterMode] = useState(false); // Track if we're filtering by category/platform (using API)
+  const [isSortMode, setIsSortMode] = useState(false); // Track if we're sorting (using API sort)
   const [categoryFilter, setCategoryFilter] = useState('');
   const [platformFilter, setPlatformFilter] = useState('');
   // default sort is empty so page doesn't auto-sort — user can choose
@@ -288,6 +402,12 @@ function App() {
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
 
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalItems, setTotalItems] = useState(0);
+  const [usePagination, setUsePagination] = useState(true); // Enable pagination by default
+
   // Advanced Search State
 const [showAdvancedSearch, setShowAdvancedSearch] = useState(false);
 const [selectedCategories, setSelectedCategories] = useState([]);
@@ -300,6 +420,28 @@ const [excludeDeprecated, setExcludeDeprecated] = useState(false);
 const [excludeSecurityIssues, setExcludeSecurityIssues] = useState(false);
   const [excludeUnmaintained, setExcludeUnmaintained] = useState(false);
   const advancedSearchRef = useRef(null);
+
+  // Simple view state persistence (dashboard | search | workspace | favorites)
+  const setView = (viewName) => {
+    setShowLandingPage(false);
+    setShowDashboard(viewName === 'dashboard');
+    setShowLibrarySearch(viewName === 'search');
+    setShowProjectWorkspace(viewName === 'workspace');
+    setShowFavoritesView(viewName === 'favorites');
+    localStorage.setItem('lastView', viewName);
+
+    // Update URL based on view
+    const routeMap = {
+      'dashboard': ROUTES.DASHBOARD,
+      'search': ROUTES.LIBRARY_SEARCH,
+      'workspace': ROUTES.PROJECT_WORKSPACE,
+      'favorites': ROUTES.FAVORITES,
+    };
+
+    if (routeMap[viewName]) {
+      navigate(routeMap[viewName]);
+    }
+  };
 
   // Close advanced search popup when clicking outside
   useEffect(() => {
@@ -324,6 +466,60 @@ const [excludeSecurityIssues, setExcludeSecurityIssues] = useState(false);
     document.documentElement.setAttribute('data-theme', savedTheme);
   }, []);
 
+  // Check if user is already authenticated on app load (session restoration)
+  useEffect(() => {
+    const checkAuthStatus = async () => {
+      try {
+        const API_URL = process.env.REACT_APP_API_URL || '';
+        const response = await fetch(`${API_URL}/api/auth/check`, {
+          method: 'GET',
+          credentials: 'include', // Include session cookie
+        });
+
+        const data = await response.json();
+
+          if (response.ok && data.authenticated) {
+          // User is authenticated - fetch user details
+          const userResponse = await fetch(`${API_URL}/api/auth/me`, {
+            method: 'GET',
+            credentials: 'include',
+          });
+
+          if (userResponse.ok) {
+            const userData = await userResponse.json();
+            if (userData.success) {
+              // Restore user session
+              setCurrentUser(userData);
+              setIsLoggedIn(true);
+              setShowLandingPage(false);
+
+              // Restore last view (default dashboard)
+              const savedView = localStorage.getItem('lastView') || 'dashboard';
+              setView(savedView);
+              // If restoring into search, load libraries right away
+              if (savedView === 'search') {
+                fetchAllLibraries();
+                fetchAllLibrariesForFilters();
+              }
+            }
+          }
+        } else {
+          // Not authenticated - show landing page
+          setIsLoggedIn(false);
+          setShowLandingPage(true);
+        }
+      } catch (error) {
+        console.error('Session restoration failed:', error);
+        // On error, assume not logged in
+        setIsLoggedIn(false);
+        setShowLandingPage(true);
+      }
+    };
+
+    // Run once on app load
+    checkAuthStatus();
+  }, []); // Empty dependency array - run only once
+
   // Handle browser back/forward buttons
   useEffect(() => {
     const handlePopState = () => {
@@ -334,41 +530,78 @@ const [excludeSecurityIssues, setExcludeSecurityIssues] = useState(false);
     };
 
     window.addEventListener('popstate', handlePopState);
-    
+
     return () => {
       window.removeEventListener('popstate', handlePopState);
     };
   }, [isLoggedIn]);
+
+  // Sync state with URL on navigation (browser back/forward)
+  useEffect(() => {
+    if (!isLoggedIn) return;
+
+    const path = location.pathname;
+
+    // Map URL to view state without triggering navigation
+    if (path === ROUTES.DASHBOARD) {
+      setShowLandingPage(false);
+      setShowDashboard(true);
+      setShowLibrarySearch(false);
+      setShowProjectWorkspace(false);
+      setShowFavoritesView(false);
+    } else if (path === ROUTES.LIBRARY_SEARCH) {
+      setShowLandingPage(false);
+      setShowDashboard(false);
+      setShowLibrarySearch(true);
+      setShowProjectWorkspace(false);
+      setShowFavoritesView(false);
+    } else if (path === ROUTES.PROJECT_WORKSPACE) {
+      setShowLandingPage(false);
+      setShowDashboard(false);
+      setShowLibrarySearch(false);
+      setShowProjectWorkspace(true);
+      setShowFavoritesView(false);
+    } else if (path === ROUTES.FAVORITES) {
+      setShowLandingPage(false);
+      setShowDashboard(false);
+      setShowLibrarySearch(false);
+      setShowProjectWorkspace(false);
+      setShowFavoritesView(true);
+    }
+  }, [location.pathname, isLoggedIn]);
 
   // Auth Handlers
   
   const handleLogin = (userData) => {
     setCurrentUser(userData);
     setIsLoggedIn(true);
-    
+
     // Check if this is a new user (first signup)
     if (userData.isNewUser) {
       // Show onboarding for new users
       setShowOnboarding(true);
       // Don't show dashboard yet - wait for "Let's go" button
+      // Navigate to dashboard URL even though onboarding is shown
+      navigate(ROUTES.DASHBOARD);
     } else {
       // Existing users - show dashboard directly
-      setShowDashboard(true);
-      setShowLibrarySearch(false);
+      setView('dashboard');
     }
   };
 
   const handleOnboardingGetStarted = () => {
     // User clicked "Let's go" - hide onboarding and show dashboard
     setShowOnboarding(false);
-    setShowDashboard(true);
-    setShowLibrarySearch(false);
+    setView('dashboard');
   };
 
   const handleDashboardSearchLibraries = () => {
     // User clicked "Search Libraries" - show library search and fetch data
     // Reset all filters and state to show all libraries
     setSearchQuery('');
+    setIsSearchMode(false); // Reset search mode
+    setIsFilterMode(false); // Reset filter mode
+    setIsSortMode(false); // Reset sort mode
     setCategoryFilter('');
     setPlatformFilter('');
     setSortBy('');
@@ -381,40 +614,69 @@ const [excludeSecurityIssues, setExcludeSecurityIssues] = useState(false);
     setExcludeDeprecated(false);
     setExcludeSecurityIssues(false);
     setExcludeUnmaintained(false);
-    setCheckboxSelectedLibraries([]);
+    //setCheckboxSelectedLibraries([]);
     setSelectedLibraries([]);
-    setComparisonCategory(null);
     setShowComparisonView(false);
     setShowAdvancedSearch(false);
     
-    setShowDashboard(false);
-    // Ensure Project Workspace is hidden when navigating to Library Search
-    setShowProjectWorkspace(false);
-    setShowLibrarySearch(true);
+    setView('search');
     fetchAllLibraries();
+    // Fetch all libraries for filter options (categories and platforms)
+    fetchAllLibrariesForFilters();
   };
 
   const handleDashboardCreateProject = () => {
-    setShowDashboard(false);
-    setShowProjectWorkspace(true);
+    setWorkspaceInitialView('list');
+    setView('workspace');
   };
 
   const handleShowProjects = () => {
     setShowLandingPage(false);
-    setShowDashboard(false);
-    setShowLibrarySearch(false);
-    setShowProjectWorkspace(true);
+    setWorkspaceInitialView('list');
+    // Guarantee pendingLibraryForNewProject is cleared before showing workspace
+    setPendingLibraryForNewProject(null);
+    setTimeout(() => {
+      setShowProjectWorkspace(false);
+      setTimeout(() => {
+        setShowProjectWorkspace(true);
+      }, 0);
+    }, 0);
+  };
+
+  // From library cards
+  const handleAddExistingProject = (library) => {
+    setLibraryForProjectModal(library);
+    setShowAddToProjectModal(true);
+  };
+
+  const handleAddNewProjectFromCard = (library) => {
+    if (library) {
+      setPendingLibraryForNewProject(library);
+    }
+    setShowAddToProjectModal(false);
+    setLibraryForProjectModal(null);
+    setWorkspaceInitialView('create');
+    setView('workspace');
+  };
+
+  const handleCloseAddToProjectModal = () => {
+    setShowAddToProjectModal(false);
+    setLibraryForProjectModal(null);
+  };
+
+  const handleAddToProjectSuccess = () => {
+    if (libraryForProjectModal?.name) {
+      alert(`Added "${libraryForProjectModal.name}" to the project.`);
+    }
+    handleCloseAddToProjectModal();
   };
 
   const handleBackToDashboard = () => {
-    setShowProjectWorkspace(false);
-    setShowLibrarySearch(false); // Ensure library search is also hidden
-    setShowDashboard(true);
+    setView('dashboard');
   };
 
   const handleDashboardViewFavorites = () => {
-    // TODO: Implement favorites view
-    alert('Favorites feature coming soon!');
+    setView('favorites');
   };
 
   const handleLogout = async () => {
@@ -431,11 +693,16 @@ const [excludeSecurityIssues, setExcludeSecurityIssues] = useState(false);
       setSelectedLibraries([]);
       setShowDashboard(false);
       setShowLibrarySearch(false);
+      setShowProjectWorkspace(false);
+      setShowFavoritesView(false);
       setShowOnboarding(false);
       setShowAccountManagement(false);
       handleResetFilters();
       // Redirect to landing page
       setShowLandingPage(true);
+      localStorage.removeItem('lastView');
+      // Navigate to home route
+      navigate(ROUTES.HOME);
       // Scroll to top
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
@@ -446,19 +713,61 @@ const [excludeSecurityIssues, setExcludeSecurityIssues] = useState(false);
 
   // Fetching Layer
   
-  const fetchAllLibraries = async () => {
-    setIsLoading(true);
-    setError(null);
-    
+  // Fetch all libraries without pagination for filter options
+  const fetchAllLibrariesForFilters = async () => {
     try {
-      const response = await fetch(`${API_URL}/api/libraries`);
-      
+      const url = new URL(`${API_URL}/api/libraries`);
+      url.searchParams.append('paginate', false);
+
+      const response = await fetch(url.toString());
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      
+
       const data = await response.json();
-      setLibraries(data);
+      // Store all libraries for filter options
+      const allLibs = Array.isArray(data) ? data : (data.libraries || []);
+      setAllLibraries(allLibs);
+      console.log(`Loaded ${allLibs.length} libraries for filter options`);
+    } catch (err) {
+      console.error('Error fetching all libraries for filters:', err);
+      // Don't set error state here - this is a background fetch
+    }
+  };
+  
+  const fetchAllLibraries = async (page = 0) => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      // Build URL with pagination parameters
+      const url = new URL(`${API_URL}/api/libraries`);
+      url.searchParams.append('paginate', usePagination);
+      if (usePagination) {
+        url.searchParams.append('page', page);
+        url.searchParams.append('size', 20);
+      }
+
+      const response = await fetch(url.toString());
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      // Handle paginated response
+      if (usePagination && data.libraries) {
+        setLibraries(data.libraries);
+        setCurrentPage(data.currentPage);
+        setTotalPages(data.totalPages);
+        setTotalItems(data.totalItems);
+      } else {
+        // Handle non-paginated response (backward compatibility)
+        setLibraries(data);
+        setTotalItems(data.length);
+      }
     } catch (err) {
       setError('Failed to fetch libraries. Please ensure your backend is running.');
       console.error('Error fetching libraries:', err);
@@ -466,6 +775,214 @@ const [excludeSecurityIssues, setExcludeSecurityIssues] = useState(false);
       setIsLoading(false);
     }
   };
+
+  // Handle page change
+  const handlePageChange = (newPage) => {
+    setCurrentPage(newPage);
+    // Only paginate if not in search mode, filter mode, or sort mode
+    if (!isSearchMode && !isFilterMode && !isSortMode) {
+      fetchAllLibraries(newPage);
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // Search libraries by name using API (searches entire database)
+  const searchLibrariesByName = async (query) => {
+    if (!query || !query.trim()) {
+      // Empty query - go back to normal view
+      setIsSearchMode(false);
+      setCurrentPage(0);
+      fetchAllLibraries(0);
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+    setIsSearchMode(true);
+
+    try {
+      const url = new URL(`${API_URL}/api/libraries/search`);
+      url.searchParams.append('name', query.trim());
+
+      const response = await fetch(url.toString());
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      
+      // Search results are not paginated - show all results
+      setLibraries(Array.isArray(data) ? data : []);
+      setCurrentPage(0);
+      setTotalPages(1);
+      setTotalItems(Array.isArray(data) ? data.length : 0);
+    } catch (err) {
+      setError('Failed to search libraries. Please try again.');
+      console.error('Error searching libraries:', err);
+      setIsSearchMode(false);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Filter libraries by category and/or platform using API
+  const filterLibrariesByCategoryAndPlatform = async (category, platform) => {
+    // If both are empty, go back to normal view
+    if (!category && !platform) {
+      setIsFilterMode(false);
+      setCurrentPage(0);
+      fetchAllLibraries(0);
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+    setIsFilterMode(true);
+
+    try {
+      // Use advanced search API to filter by category and/or platform
+      const criteria = {
+        categories: category ? [category] : null,
+        platforms: platform ? [platform] : null,
+        searchQuery: null,
+        minStars: null,
+        maxStars: null,
+        minDependents: null,
+        maxDependents: null,
+        lastCommitAfter: null,
+        includeGrades: null,
+        excludeDeprecated: false,
+        excludeSecurityVulnerabilities: false,
+        excludeUnmaintained: false,
+        sortBy: sortBy || null
+      };
+
+      const response = await fetch(`${API_URL}/api/libraries/advanced-search`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(criteria),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      
+      // Filter results are not paginated - show all results
+      setLibraries(Array.isArray(data) ? data : []);
+      setCurrentPage(0);
+      setTotalPages(1);
+      setTotalItems(Array.isArray(data) ? data.length : 0);
+    } catch (err) {
+      setError('Failed to filter libraries. Please try again.');
+      console.error('Error filtering libraries:', err);
+      setIsFilterMode(false);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Search effect: Trigger API search when searchQuery changes (with debouncing)
+  useEffect(() => {
+    // Only search if we're in the library search view
+    if (!showLibrarySearch) return;
+
+    const timeoutId = setTimeout(() => {
+      searchLibrariesByName(searchQuery);
+    }, 500); // 500ms debounce
+
+    return () => clearTimeout(timeoutId);
+  }, [searchQuery, showLibrarySearch]);
+
+  // Fetch sorted libraries using API (sorts entire database)
+  const fetchSortedLibraries = async (sortOption) => {
+    // If no sort option, go back to normal view
+    if (!sortOption || !sortOption.trim()) {
+      setIsSortMode(false);
+      setCurrentPage(0);
+      fetchAllLibraries(0);
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+    setIsSortMode(true);
+
+    try {
+      // Use advanced search API to get all libraries sorted
+      const criteria = {
+        categories: null,
+        platforms: null,
+        searchQuery: null,
+        minStars: null,
+        maxStars: null,
+        minDependents: null,
+        maxDependents: null,
+        lastCommitAfter: null,
+        includeGrades: null,
+        excludeDeprecated: false,
+        excludeSecurityVulnerabilities: false,
+        excludeUnmaintained: false,
+        sortBy: sortOption
+      };
+
+      const response = await fetch(`${API_URL}/api/libraries/advanced-search`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(criteria),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      
+      // Sorted results are not paginated - show all results
+      setLibraries(Array.isArray(data) ? data : []);
+      setCurrentPage(0);
+      setTotalPages(1);
+      setTotalItems(Array.isArray(data) ? data.length : 0);
+    } catch (err) {
+      setError('Failed to sort libraries. Please try again.');
+      console.error('Error sorting libraries:', err);
+      setIsSortMode(false);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Filter effect: Trigger API filter when categoryFilter or platformFilter changes
+  useEffect(() => {
+    // Only filter if we're in the library search view, not in search mode, and search query is empty
+    if (!showLibrarySearch || isSearchMode || searchQuery.trim()) return;
+
+    // Debounce filter changes
+    const timeoutId = setTimeout(() => {
+      filterLibrariesByCategoryAndPlatform(categoryFilter, platformFilter);
+    }, 300); // 300ms debounce for filters
+
+    return () => clearTimeout(timeoutId);
+  }, [categoryFilter, platformFilter, showLibrarySearch, isSearchMode, searchQuery, sortBy]);
+
+  // Sort effect: Trigger API sort when sortBy changes (only when not searching or filtering)
+  useEffect(() => {
+    // Only sort if we're in the library search view, not in search mode, not in filter mode, and no search query
+    if (!showLibrarySearch || isSearchMode || isFilterMode || searchQuery.trim() || categoryFilter || platformFilter) return;
+
+    // Debounce sort changes
+    const timeoutId = setTimeout(() => {
+      fetchSortedLibraries(sortBy);
+    }, 300); // 300ms debounce for sort
+
+    return () => clearTimeout(timeoutId);
+  }, [sortBy, showLibrarySearch, isSearchMode, isFilterMode, searchQuery, categoryFilter, platformFilter]);
 
   
   const formatDependents = (count) => {
@@ -480,24 +997,30 @@ const [excludeSecurityIssues, setExcludeSecurityIssues] = useState(false);
  const filteredLibraries = useMemo(() => {
   let result = [...libraries];
 
-  if (searchQuery.trim()) {
+  // Skip client-side search filtering if we're using API search results
+  // The API already filtered by searchQuery, so we don't need to filter again
+  if (!isSearchMode && searchQuery.trim()) {
     result = result.filter(lib =>
       lib.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (lib.description && lib.description.toLowerCase().includes(searchQuery.toLowerCase()))
     );
   }
 
-  // Category filter: Use basic dropdown (categories removed from advanced search to avoid duplication)
-  if (categoryFilter) {
-    result = result.filter(lib => {
-      if (lib.categories && lib.categories.toLowerCase().includes(categoryFilter.toLowerCase())) return true;
-      return false;
-    });
-  }
+  // Skip client-side category/platform filtering if we're using API filter results
+  // The API already filtered by categoryFilter and platformFilter, so we don't need to filter again
+  if (!isFilterMode) {
+    // Category filter: Use basic dropdown (categories removed from advanced search to avoid duplication)
+    if (categoryFilter) {
+      result = result.filter(lib => {
+        if (lib.categories && lib.categories.toLowerCase().includes(categoryFilter.toLowerCase())) return true;
+        return false;
+      });
+    }
 
-  // Platform filter: Use basic dropdown (platforms removed from advanced search to avoid duplication)
-  if (platformFilter) {
-    result = result.filter(lib => lib.packageManager === platformFilter);
+    // Platform filter: Use basic dropdown (platforms removed from advanced search to avoid duplication)
+    if (platformFilter) {
+      result = result.filter(lib => lib.packageManager === platformFilter);
+    }
   }
 
   // Advanced filters: Star range
@@ -548,30 +1071,35 @@ const [excludeSecurityIssues, setExcludeSecurityIssues] = useState(false);
     });
   }
 
-  result.sort((a, b) => {
-    switch (sortBy) {
-      case 'stars':
-        return (b.githubStars || 0) - (a.githubStars || 0);
-      case 'dependents':
-        return (b.dependentProjectsCount || 0) - (a.dependentProjectsCount || 0);
-      case 'name':
-        return a.name.localeCompare(b.name);
-      case 'updated':
-        return new Date(b.lastRepositoryReleaseDate || b.lastRegistryReleaseDate || 0) - new Date(a.lastRepositoryReleaseDate || a.lastRegistryReleaseDate || 0);
-      default:
-        return 0;
-    }
-  });
+  // Skip client-side sorting if we're using API sort results
+  // The API already sorted the libraries, so we don't need to sort again
+  if (!isSortMode && !isSearchMode && !isFilterMode) {
+    result.sort((a, b) => {
+      switch (sortBy) {
+        case 'stars':
+          return (b.githubStars || 0) - (a.githubStars || 0);
+        case 'dependents':
+          return (b.dependentProjectsCount || 0) - (a.dependentProjectsCount || 0);
+        case 'name':
+          return a.name.localeCompare(b.name);
+        case 'updated':
+          return new Date(b.lastRepositoryReleaseDate || b.lastRegistryReleaseDate || 0) - new Date(a.lastRepositoryReleaseDate || a.lastRegistryReleaseDate || 0);
+        default:
+          return 0;
+      }
+    });
+  }
 
   return result;
-}, [libraries, searchQuery, categoryFilter, platformFilter, sortBy, starRange, dependentsRange, includeGrades, excludeDeprecated, excludeSecurityIssues, excludeUnmaintained, lastCommitMonths]);
+}, [libraries, searchQuery, isSearchMode, isFilterMode, isSortMode, categoryFilter, platformFilter, sortBy, starRange, dependentsRange, includeGrades, excludeDeprecated, excludeSecurityIssues, excludeUnmaintained, lastCommitMonths]);
 
     
  // Get all unique categories from comma-separated categories string
+ // Use allLibraries (unfiltered) so filter options reflect all available libraries
 const uniqueCategories = useMemo(() => {
   const categorySet = new Set();
   
-  libraries.forEach(lib => {
+  allLibraries.forEach(lib => {
     // Add all categories from the categories string
     if (lib.categories) {
       lib.categories.split(',').forEach(cat => {
@@ -583,11 +1111,47 @@ const uniqueCategories = useMemo(() => {
   
   // Convert to sorted array
   return Array.from(categorySet).sort();
-}, [libraries]);
+}, [allLibraries]);
 
 const uniquePlatforms = useMemo(() => {
-  return [...new Set(libraries.map(lib => lib.packageManager).filter(Boolean))];
-}, [libraries]);
+  const platforms = new Set();
+  allLibraries.forEach(lib => {
+    // Extract platform from packageManager field, handling null/undefined/empty
+    const platform = lib.packageManager;
+    if (platform && platform.trim() !== '') {
+      platforms.add(platform.trim());
+    }
+  });
+  return Array.from(platforms).sort();
+}, [allLibraries]);
+
+// Calculate platform counts from all libraries (not filtered)
+const platformCounts = useMemo(() => {
+  const counts = {};
+  allLibraries.forEach(lib => {
+    const platform = lib.packageManager;
+    if (platform && platform.trim() !== '') {
+      counts[platform] = (counts[platform] || 0) + 1;
+    }
+  });
+  return counts;
+}, [allLibraries]);
+
+// Calculate category counts from all libraries (not filtered)
+const categoryCounts = useMemo(() => {
+  const counts = {};
+  allLibraries.forEach(lib => {
+    if (lib.categories) {
+      lib.categories.split(',').forEach(cat => {
+        const trimmed = cat.trim();
+        if (trimmed) {
+          counts[trimmed] = (counts[trimmed] || 0) + 1;
+        }
+      });
+    }
+  });
+  return counts;
+}, [allLibraries]);
 
   const handleRemoveLibrary = (libraryId) => {
     const updatedLibraries = selectedLibraries.filter(lib => lib.id !== libraryId);
@@ -599,78 +1163,6 @@ const uniquePlatforms = useMemo(() => {
       setShowComparisonView(false);
     }
   };
-
-  // Checkbox Selection Handlers
-  const handleCheckboxToggle = (library, event) => {
-    event.stopPropagation(); // Prevent card click
-    const isSelected = checkboxSelectedLibraries.find(lib => lib.id === library.id);
-    if (isSelected) {
-      setCheckboxSelectedLibraries(checkboxSelectedLibraries.filter(lib => lib.id !== library.id));
-    } else {
-      setCheckboxSelectedLibraries([...checkboxSelectedLibraries, library]);
-    }
-  };
-
-  const handleToggleFavorite = async (library, event) => {
-    event.stopPropagation(); // Prevent card click
-    const isFavorite = favoriteLibraries.find(lib => lib.id === library.id);
-    
-    try {
-      // TODO: Call API to add/remove favorite
-      // For now, just update local state
-      if (isFavorite) {
-        setFavoriteLibraries(favoriteLibraries.filter(lib => lib.id !== library.id));
-      } else {
-        setFavoriteLibraries([...favoriteLibraries, library]);
-      }
-    } catch (error) {
-      console.error('Error toggling favorite:', error);
-    }
-  };
-
-  const handleAddToProject = () => {
-    if (checkboxSelectedLibraries.length === 0) {
-      alert('Please select at least one library');
-      return;
-    }
-    // TODO: Implement add to project functionality
-    alert(`Adding ${checkboxSelectedLibraries.length} library/libraries to project...`);
-    setCheckboxSelectedLibraries([]);
-  };
-
-  const handleCompareSelectedLibraries = () => {
-    if (checkboxSelectedLibraries.length < 2) {
-      alert('Please select at least 2 libraries to compare');
-      return;
-    }
-    
-    // Check if all selected libraries are from the same category
-    const categories = checkboxSelectedLibraries.map(lib => {
-      return lib.categories ? lib.categories.split(',')[0].trim() : null;
-    }).filter(Boolean);
-    
-    const uniqueCategories = [...new Set(categories)];
-    if (uniqueCategories.length > 1) {
-      alert('Please select libraries from the same category to compare');
-      return;
-    }
-    
-    // Set them as selected libraries and show comparison view
-    setSelectedLibraries(checkboxSelectedLibraries);
-    setComparisonCategory(uniqueCategories[0] || null);
-    setShowComparisonView(true);
-    setCheckboxSelectedLibraries([]);
-  };
-
-  // Check if checkbox-selected libraries can be compared (2+ from same category)
-  const canCompareSelected = useMemo(() => {
-    if (checkboxSelectedLibraries.length < 2) return false;
-    const categories = checkboxSelectedLibraries.map(lib => {
-      return lib.categories ? lib.categories.split(',')[0].trim() : null;
-    }).filter(Boolean);
-    const uniqueCategories = [...new Set(categories)];
-    return uniqueCategories.length === 1;
-  }, [checkboxSelectedLibraries]);
 
   const handleCloseComparisonView = () => {
     setShowComparisonView(false);
@@ -685,11 +1177,60 @@ const uniquePlatforms = useMemo(() => {
     setSelectedLibraryForDetails(null);
   };
 
+  const getPrimaryCategory = (lib) => {
+    if (!lib || !lib.categories) return '';
+    return lib.categories.split(',')[0].trim();
+  };
+
+  // Compare handlers (up to 3 libraries, same category, manual open)
+  const handleToggleCompareLibrary = (library) => {
+    const exists = compareSelection.find((lib) => lib.id === library.id);
+    let updated;
+    if (exists) {
+      updated = compareSelection.filter((lib) => lib.id !== library.id);
+      const remainingCategory = updated.length ? getPrimaryCategory(updated[0]) : '';
+      setComparisonCategory(remainingCategory);
+    } else {
+      const libCat = getPrimaryCategory(library);
+      if (comparisonCategory && libCat && comparisonCategory !== libCat) {
+        alert('Please select libraries from the same category to compare.');
+        return;
+      }
+      if (compareSelection.length >= 3) {
+        alert('You can compare up to 3 libraries.');
+        return;
+      }
+      updated = [...compareSelection, library];
+      if (!comparisonCategory && libCat) {
+        setComparisonCategory(libCat);
+      }
+    }
+
+    setCompareSelection(updated);
+    if (updated.length < 2) {
+      setShowComparisonView(false);
+    }
+  };
+
+  const handleRemoveFromCompare = (libraryId) => {
+    const updated = compareSelection.filter((lib) => lib.id !== libraryId);
+    setCompareSelection(updated);
+    const remainingCategory = updated.length ? getPrimaryCategory(updated[0]) : '';
+    setComparisonCategory(remainingCategory);
+    if (updated.length < 2) {
+      setShowComparisonView(false);
+    }
+  };
+
   const handleResetFilters = () => {
     setSearchQuery('');
+    setIsSearchMode(false); // Exit search mode
+    setIsFilterMode(false); // Exit filter mode
+    setIsSortMode(false); // Exit sort mode
     setCategoryFilter('');
     setPlatformFilter('');
     setSortBy('');
+    fetchAllLibraries(); // Back to showing all
   };
 
   // Toggle category selection (multi-select)
@@ -783,6 +1324,7 @@ const handleAdvancedSearch = async () => {
   setPlatformFilter(''); // Reset basic platform filter
   setSortBy('');
   fetchAllLibraries(); // Back to showing all
+  fetchAllLibrariesForFilters(); // Refresh filter options
 };
 
   // Handler for getting started from landing page (triggers login)
@@ -794,6 +1336,7 @@ const handleAdvancedSearch = async () => {
     } else {
       setShowLandingPage(false);
       fetchAllLibraries();
+      fetchAllLibrariesForFilters();
     }
   };
 
@@ -804,10 +1347,13 @@ const handleAdvancedSearch = async () => {
       setShowLandingPage(false);
       setShowLibrarySearch(false);
       setShowProjectWorkspace(false);
+      setShowFavoritesView(false);
       setShowDashboard(true);
+      navigate(ROUTES.DASHBOARD);
     } else {
       // Non-logged in users go to landing page
       setShowLandingPage(true);
+      navigate(ROUTES.HOME);
     }
     setSelectedLibraries([]);
     setComparisonCategory(null);
@@ -949,6 +1495,7 @@ const handleAdvancedSearch = async () => {
           currentUser={currentUser}
           onProjects={handleShowProjects}
           onSearchLibraries={handleDashboardSearchLibraries}
+          onViewFavorites={handleDashboardViewFavorites}
         >
           <UserBadge user={currentUser} onLogout={handleLogout} />
         </Header>
@@ -983,21 +1530,63 @@ const handleAdvancedSearch = async () => {
   if (showProjectWorkspace && isLoggedIn && currentUser) {
     return (
       <div className="app">
-        <Header 
+        <Header
           onHome={handleGoHome}
           isLoggedIn={true}
           currentUser={currentUser}
           onProjects={handleShowProjects}
           onSearchLibraries={handleDashboardSearchLibraries}
+          onViewFavorites={handleDashboardViewFavorites}
         >
-          <UserBadge 
-            user={currentUser} 
-            onLogout={handleLogout} 
-            onAccountSettings={() => setShowAccountManagement(true)} 
+          <UserBadge
+            user={currentUser}
+            onLogout={handleLogout}
+            onAccountSettings={() => setShowAccountManagement(true)}
           />
         </Header>
-        <ProjectWorkspace onBack={handleBackToDashboard} onNavigateToCatalog={handleDashboardSearchLibraries} />
-        <Footer 
+        <ProjectWorkspace
+          key={workspaceInitialView}
+          initialView={workspaceInitialView}
+          onBack={handleBackToDashboard}
+          onNavigateToCatalog={handleDashboardSearchLibraries}
+          pendingLibrary={pendingLibraryForNewProject}
+          onLibraryAttached={() => setPendingLibraryForNewProject(null)}
+        />
+        <Footer
+          onHome={handleGoHome}
+          onAboutUs={handleShowAboutUs}
+          onTerms={handleShowTerms}
+          onPrivacy={handleShowPrivacy}
+        />
+        {showTermsModal && <TermsOfService onClose={() => setShowTermsModal(false)} />}
+        {showPrivacyModal && <PrivacyPolicy onClose={() => setShowPrivacyModal(false)} />}
+      </div>
+    );
+  }
+
+  // Show Favorites View
+  if (showFavoritesView && isLoggedIn && currentUser) {
+    return (
+      <div className="app">
+        <Header
+          onHome={handleGoHome}
+          isLoggedIn={true}
+          currentUser={currentUser}
+          onProjects={handleShowProjects}
+          onSearchLibraries={handleDashboardSearchLibraries}
+          onViewFavorites={handleDashboardViewFavorites}
+        >
+          <UserBadge
+            user={currentUser}
+            onLogout={handleLogout}
+            onAccountSettings={() => setShowAccountManagement(true)}
+          />
+        </Header>
+        <FavoritesView
+          onBack={handleBackToDashboard}
+          onViewDetails={handleViewDetails}
+        />
+        <Footer
           onHome={handleGoHome}
           onAboutUs={handleShowAboutUs}
           onTerms={handleShowTerms}
@@ -1074,6 +1663,7 @@ const handleAdvancedSearch = async () => {
         currentUser={currentUser}
         onProjects={handleShowProjects}
         onSearchLibraries={handleDashboardSearchLibraries}
+        onViewFavorites={handleDashboardViewFavorites}
       >
         <UserBadge 
           user={currentUser} 
@@ -1102,17 +1692,15 @@ const handleAdvancedSearch = async () => {
             {/* Filters - Right Side */}
             <div className="filter-controls-wrapper">
               <div className="filter-control-group">
-                <label className="filter-label">Filter: Category</label>
+                <label className="filter-label">Category</label>
                 <select
                   className="filter-select-modern"
                   value={categoryFilter}
                   onChange={(e) => setCategoryFilter(e.target.value)}
                 >
-                  <option value="">All Categories ({libraries.length})</option>
+                  <option value="">All Categories ({uniqueCategories.length})</option>
                   {uniqueCategories.map(cat => {
-                    const count = libraries.filter(lib => 
-                      lib.categories && lib.categories.toLowerCase().includes(cat.toLowerCase())
-                    ).length;
+                    const count = categoryCounts[cat] || 0;
                     return (
                       <option key={cat} value={cat}>{cat} ({count})</option>
                     );
@@ -1121,16 +1709,19 @@ const handleAdvancedSearch = async () => {
               </div>
 
               <div className="filter-control-group">
-                <label className="filter-label">Filter: Platform</label>
+                <label className="filter-label">Platform</label>
                 <select
                   className="filter-select-modern"
                   value={platformFilter}
                   onChange={(e) => setPlatformFilter(e.target.value)}
                 >
-                  <option value="">All Platforms</option>
-                  {uniquePlatforms.map(platform => (
-                    <option key={platform} value={platform}>{platform}</option>
-                  ))}
+                  <option value="">All Platforms ({uniquePlatforms.length})</option>
+                  {uniquePlatforms.map(platform => {
+                    const count = platformCounts[platform] || 0;
+                    return (
+                      <option key={platform} value={platform}>{platform} ({count})</option>
+                    );
+                  })}
                 </select>
               </div>
 
@@ -1155,7 +1746,7 @@ const handleAdvancedSearch = async () => {
                   onClick={() => setShowAdvancedSearch(!showAdvancedSearch)}
                   title="Advanced Search Options"
                 >
-                  {showAdvancedSearch ? '▲' : '▼'}
+                  {showAdvancedSearch ? 'Hide Advanced ▲' : 'Show Advanced ▼'}
                 </button>
 
                 {/* Advanced Search Panel (Popup) */}
@@ -1293,41 +1884,8 @@ const handleAdvancedSearch = async () => {
           </div>
         </section>
 
-      {/* FLOATING ACTION BAR (when libraries selected via checkbox) */}
-      {checkboxSelectedLibraries.length > 0 && (
-        <div className="checkbox-action-bar">
-          <div className="checkbox-action-bar-content">
-            <div className="checkbox-action-bar-header">
-              <h3>Selected ({checkboxSelectedLibraries.length} {checkboxSelectedLibraries.length === 1 ? 'library' : 'libraries'})</h3>
-            </div>
-            <div className="checkbox-action-bar-actions">
-              <button
-                className="action-btn-primary"
-                onClick={handleAddToProject}
-              >
-                Add to Project
-              </button>
-              {canCompareSelected && (
-                <button
-                  className="action-btn-secondary"
-                  onClick={handleCompareSelectedLibraries}
-                >
-                  Compare Libraries
-                </button>
-              )}
-              <button
-                className="action-btn-clear"
-                onClick={() => setCheckboxSelectedLibraries([])}
-              >
-                Clear Selection
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* LIBRARY LIST */}
-      <section className={`library-list-section ${checkboxSelectedLibraries.length > 0 ? 'has-action-bar' : ''}`}>
+      <section className="library-list-section">
           {isLoading ? (
             <div className="loading-state">
               <p>Loading libraries...</p>
@@ -1343,23 +1901,92 @@ const handleAdvancedSearch = async () => {
               <button onClick={handleResetFilters}>Clear Filters</button>
             </div>
           ) : (
-            <div className="library-grid">
-              {filteredLibraries.map(library => (
-                <LibraryCard
-                  key={library.id}
-                  library={library}
-                  checkboxSelectedLibraries={checkboxSelectedLibraries}
-                  favoriteLibraries={favoriteLibraries}
-                  onCheckboxToggle={handleCheckboxToggle}
-                  onToggleFavorite={handleToggleFavorite}
-                  onViewDetails={handleViewDetails}
+            <>
+              <div className="library-grid">
+                {filteredLibraries.map(library => (
+                  <LibraryCard
+                    key={library.id}
+                    library={library}
+                    onViewDetails={handleViewDetails}
+            onAddExistingProject={handleAddExistingProject}
+            onAddNewProject={handleAddNewProjectFromCard}
+                    onToggleCompare={handleToggleCompareLibrary}
+                    isCompared={!!compareSelection.find((lib) => lib.id === library.id)}
+                  />
+                ))}
+              </div>
+
+              {/* Pagination Controls */}
+              {usePagination && totalPages > 1 && (
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  totalItems={totalItems}
+                  onPageChange={handlePageChange}
                 />
-              ))}
-            </div>
+              )}
+            </>
           )}
         </section>
 
+        {/* Compare queue bar */}
+        {compareSelection.length > 0 && (
+          <div className="compare-queue">
+            <div className="compare-queue-left">
+              <span className="compare-queue-title">
+                Compare ({compareSelection.length}/3):
+              </span>
+              <div className="compare-queue-list">
+                {compareSelection.map((lib) => (
+                  <span key={lib.id} className="compare-chip">
+                    <span className="compare-chip-name">{lib.name}</span>
+                    <button
+                      className="compare-chip-remove"
+                      onClick={() => handleRemoveFromCompare(lib.id)}
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+            </div>
+            <div className="compare-queue-actions">
+              <button
+                className="view-details-link"
+                disabled={compareSelection.length < 2}
+                onClick={() => {
+                  if (compareSelection.length < 2) return;
+                  setSelectedLibraries(compareSelection);
+                  setShowComparisonView(true);
+                }}
+              >
+                Open Comparison
+              </button>
+              <button
+                className="view-details-link secondary"
+                onClick={() => {
+                  setCompareSelection([]);
+                  setComparisonCategory('');
+                  setShowComparisonView(false);
+                }}
+              >
+                Clear
+              </button>
+            </div>
+          </div>
+        )}
+
       </main>
+
+      {showAddToProjectModal && libraryForProjectModal && (
+        <AddToProjectModal
+          isOpen={showAddToProjectModal}
+          onClose={handleCloseAddToProjectModal}
+          library={libraryForProjectModal}
+          onSuccess={handleAddToProjectSuccess}
+          onCreateProject={() => handleAddNewProjectFromCard(libraryForProjectModal)}
+        />
+      )}
 
       <Footer 
         onHome={handleGoHome}

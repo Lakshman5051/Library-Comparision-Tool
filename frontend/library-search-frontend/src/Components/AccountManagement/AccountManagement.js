@@ -1,8 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import './AccountManagement.css';
 
 function AccountManagement({ user, onClose, onUpdateUser }) {
   const [activeTab, setActiveTab] = useState('email'); // 'email', 'password', 'theme'
+  
+  // Theme state
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    return document.documentElement.getAttribute('data-theme') === 'dark';
+  });
   
   // Email change state
   const [newEmail, setNewEmail] = useState('');
@@ -18,6 +23,20 @@ function AccountManagement({ user, onClose, onUpdateUser }) {
   const [passwordError, setPasswordError] = useState('');
   const [passwordSuccess, setPasswordSuccess] = useState('');
   const [isChangingPassword, setIsChangingPassword] = useState(false);
+  
+  // Sync theme state with DOM changes
+  useEffect(() => {
+    const observer = new MutationObserver(() => {
+      setIsDarkMode(document.documentElement.getAttribute('data-theme') === 'dark');
+    });
+    
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-theme']
+    });
+    
+    return () => observer.disconnect();
+  }, []);
   const [showPasswords, setShowPasswords] = useState({
     current: false,
     new: false,
@@ -143,10 +162,10 @@ function AccountManagement({ user, onClose, onUpdateUser }) {
   };
 
   const toggleTheme = () => {
-    const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
-    const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+    const newTheme = isDarkMode ? 'light' : 'dark';
     document.documentElement.setAttribute('data-theme', newTheme);
     localStorage.setItem('theme', newTheme);
+    setIsDarkMode(!isDarkMode);
   };
 
   return (
@@ -342,7 +361,7 @@ function AccountManagement({ user, onClose, onUpdateUser }) {
                 <label className="theme-switch">
                   <input 
                     type="checkbox" 
-                    checked={document.documentElement.getAttribute('data-theme') === 'dark'}
+                    checked={isDarkMode}
                     onChange={toggleTheme}
                   />
                   <span className="slider"></span>

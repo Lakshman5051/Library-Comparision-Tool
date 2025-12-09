@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import AddToProjectModal from '../ProjectWorkspace/AddToProjectModal';
+import { addFavorite, removeFavorite, checkIfFavorited } from '../../Services/favoriteService';
 
 function formatStars(stars) {
   if (!stars && stars !== 0) return 'N/A';
@@ -8,31 +9,146 @@ function formatStars(stars) {
   return stars.toString();
 }
 
-function LibraryCard({ library, onClick, onToggleCompare, isSelectedForCompare }) {
+function LibraryCard({ library, isFavorited: initialIsFavorited = null, onFavoriteChange }) {
   const [showAddToProject, setShowAddToProject] = useState(false);
+  const [showAddToNewProject, setShowAddToNewProject] = useState(false);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [isFavorited, setIsFavorited] = useState(initialIsFavorited);
+  const [favoriteLoading, setFavoriteLoading] = useState(false);
+
+  // Check favorite status on mount if not provided
+  useEffect(() => {
+    if (initialIsFavorited === null && library.id) {
+      checkIfFavorited(library.id)
+        .then((data) => {
+          if (data.success) {
+            setIsFavorited(data.isFavorited);
+          }
+        })
+        .catch((err) => {
+          console.error('Error checking favorite status:', err);
+        });
+    }
+  }, [library.id, initialIsFavorited]);
 
   const handleAddSuccess = (projectId) => {
     alert(`Successfully added "${library.name}" to project!`);
   };
 
+  const handleToggleFavorite = async (e) => {
+    e.stopPropagation();
+    setFavoriteLoading(true);
+
+    try {
+      if (isFavorited) {
+        const data = await removeFavorite(library.id);
+        if (data.success) {
+          setIsFavorited(false);
+          if (onFavoriteChange) onFavoriteChange(library.id, false);
+        }
+      } else {
+        const data = await addFavorite(library.id);
+        if (data.success) {
+          setIsFavorited(true);
+          if (onFavoriteChange) onFavoriteChange(library.id, true);
+        }
+      }
+    } catch (err) {
+      alert(err.message || 'Failed to update favorite');
+    } finally {
+      setFavoriteLoading(false);
+    }
+  };
+
   return (
-    <div className={`library-card ${isSelectedForCompare ? 'selected' : ''}`}>
+    <div className="library-card">
       {/* Header Section */}
       <div className="library-card-header">
         <div className="library-card-title-row">
           <div className="library-card-title-large">{library.name}</div>
-          {library.latestVersion && (
-            <span className="library-card-version-badge">v{library.latestVersion}</span>
-          )}
-          {/*<button
-            className="add-to-project-btn"
-            onClick={() => setShowAddToProject(true)}
-            title="Add this library to a project"
-            style={{ marginLeft: 'auto' }}
-          >
-            + Add to Project
-          </button>*/}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {library.latestVersion && (
+              <span className="library-card-version-badge">v{library.latestVersion}</span>
+            )}
+            <button
+              className={`favorite-button ${isFavorited ? 'favorited' : ''} ${favoriteLoading ? 'loading' : ''}`}
+              onClick={handleToggleFavorite}
+              disabled={favoriteLoading}
+              title={isFavorited ? 'Remove from favorites' : 'Add to favorites'}
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: favoriteLoading ? 'not-allowed' : 'pointer',
+                padding: '4px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'transform 0.2s ease',
+                opacity: favoriteLoading ? 0.5 : 1
+              }}
+            >
+              {favoriteLoading ? (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="12" cy="12" r="10" opacity="0.25"/>
+                  <path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round">
+                    <animateTransform
+                      attributeName="transform"
+                      type="rotate"
+                      from="0 12 12"
+                      to="360 12 12"
+                      dur="1s"
+                      repeatCount="indefinite"
+                    />
+                  </path>
+                </svg>
+              ) : (
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill={isFavorited ? '#e74c3c' : 'none'}
+                  stroke={isFavorited ? '#e74c3c' : '#999'}
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  style={{
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                </svg>
+              )}
+            </button>
+          </div>
         </div>
+              {/* ...existing code for meta, description, attributes, etc... */}
+              {/* Action Buttons at the bottom */}
+              <div className="library-card-actions" style={{ display: 'flex', gap: '12px', marginTop: '18px' }}>
+                <button
+                  className="view-details-btn"
+                  type="button"
+                  onClick={() => {
+                    if (library.onClick) library.onClick();
+                  }}
+                >
+                  View Details
+                </button>
+                <div className="add-to-project-dropdown" style={{ position: 'relative' }}>
+                  <button
+                    className="add-to-project-btn"
+                    onClick={() => setDropdownOpen((open) => !open)}
+                    title="Add this library to a project"
+                  >
+                    + Add to Project
+                  </button>
+                  {dropdownOpen && (
+                    <div className="add-to-project-menu" style={{ position: 'absolute', left: 0, top: '100%', zIndex: 10, background: '#fff', border: '1px solid #eee', borderRadius: '4px', boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
+                      <button className="add-to-project-menu-item" onClick={() => { setShowAddToNewProject(true); setDropdownOpen(false); }}>Add to New Project</button>
+                      <button className="add-to-project-menu-item" onClick={() => { setShowAddToProject(true); setDropdownOpen(false); }}>Add to Existing Project</button>
+                    </div>
+                  )}
+                </div>
+              </div>
         <div className="library-card-meta-row">
           {library.lastRegistryReleaseDate && (
             <span className="library-card-updated">
@@ -68,10 +184,25 @@ function LibraryCard({ library, onClick, onToggleCompare, isSelectedForCompare }
       <div className="library-card-attributes">
         {showAddToProject && (
           <AddToProjectModal
+            isOpen={showAddToProject}
             library={library}
             onClose={() => setShowAddToProject(false)}
-            onAddSuccess={handleAddSuccess}
+            onSuccess={handleAddSuccess}
+            onCreateProject={() => {
+              setShowAddToProject(false);
+              setShowAddToNewProject(true);
+            }}
           />
+        )}
+        {showAddToNewProject && (
+          <div className="add-to-new-project-modal">
+            {/* Replace with your actual new project modal/component */}
+            <div style={{ background: '#fff', border: '1px solid #eee', borderRadius: '8px', padding: '24px', maxWidth: '400px', margin: '32px auto', boxShadow: '0 2px 12px rgba(0,0,0,0.12)' }}>
+              <h3>Add "{library.name}" to a New Project</h3>
+              <p>Implement your new project creation flow here.</p>
+              <button onClick={() => setShowAddToNewProject(false)}>Close</button>
+            </div>
+          </div>
         )}
         <div className="library-card-attributes-left">
           {library.categories && (
@@ -128,56 +259,57 @@ function LibraryCard({ library, onClick, onToggleCompare, isSelectedForCompare }
         </div>
       )}
       
-      {/* Action Button */}
-      <div className="library-card-actions">
+      {/* Action Buttons at the bottom */}
+      <div className="library-card-actions" style={{ display: 'flex', gap: '12px', marginTop: '18px' }}>
         <button
-          className="btn-add-to-project"
+          className="view-details-btn"
           type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            setShowAddToProject(true);
-          }}
-          title="Add to Project"
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M12 5v14M5 12h14"/>
-          </svg>
-          Add to Project
-        </button>
-        <button
-          className="btn-primary"
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggleCompare();
-          }}
-        >
-          {isSelectedForCompare ? 'Remove' : 'Compare'}
-        </button>
-        <button
-          className="btn-secondary"
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            if (onClick) onClick();
+          onClick={() => {
+            if (library.onClick) library.onClick();
           }}
         >
           View Details
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
-            <polyline points="15 3 21 3 21 9"></polyline>
-            <line x1="10" y1="14" x2="21" y2="3"></line>
-          </svg>
         </button>
+        <div className="add-to-project-dropdown" style={{ position: 'relative' }}>
+          <button
+            className="add-to-project-btn"
+            onClick={() => setDropdownOpen((open) => !open)}
+            title="Add this library to a project"
+          >
+            + Add to Project
+          </button>
+          {dropdownOpen && (
+            <div className="add-to-project-menu" style={{ position: 'fixed', left: '50%', top: 'calc(100% + 32px)', transform: 'translateX(-50%)', zIndex: 9999, background: '#fff', border: '1px solid #eee', borderRadius: '8px', boxShadow: '0 4px 24px rgba(124,58,237,0.12)', minWidth: '220px', padding: '8px 0' }}>
+              <button className="add-to-project-menu-item" style={{ width: '100%', padding: '12px 20px', background: 'none', border: 'none', textAlign: 'left', fontSize: '1rem', cursor: 'pointer' }} onClick={() => { setShowAddToNewProject(true); setDropdownOpen(false); }}>Add to New Project</button>
+              <button className="add-to-project-menu-item" style={{ width: '100%', padding: '12px 20px', background: 'none', border: 'none', textAlign: 'left', fontSize: '1rem', cursor: 'pointer' }} onClick={() => { setShowAddToProject(true); setDropdownOpen(false); }}>Add to Existing Project</button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Add to Project Modal */}
-      <AddToProjectModal
-        isOpen={showAddToProject}
-        onClose={() => setShowAddToProject(false)}
-        library={library}
-        onSuccess={handleAddSuccess}
-      />
+      {showAddToProject && (
+        <AddToProjectModal
+          isOpen={showAddToProject}
+          library={library}
+          onClose={() => setShowAddToProject(false)}
+          onSuccess={handleAddSuccess}
+          onCreateProject={() => {
+            setShowAddToProject(false);
+            setShowAddToNewProject(true);
+          }}
+        />
+      )}
+      {showAddToNewProject && (
+        <div className="add-to-new-project-modal">
+          {/* Replace with your actual new project modal/component */}
+          <div style={{ background: '#fff', border: '1px solid #eee', borderRadius: '8px', padding: '24px', maxWidth: '400px', margin: '32px auto', boxShadow: '0 2px 12px rgba(0,0,0,0.12)' }}>
+            <h3>Add "{library.name}" to a New Project</h3>
+            <p>Implement your new project creation flow here.</p>
+            <button onClick={() => setShowAddToNewProject(false)}>Close</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

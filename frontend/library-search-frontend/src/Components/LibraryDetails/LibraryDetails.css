@@ -51,7 +51,7 @@
 
 /* Header Card - Name, Description, and Metrics */
 .library-details-header-card {
-  background: white;
+  background: var(--bg-primary, white);
   border-radius: 12px;
   padding: 2rem;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
@@ -113,7 +113,7 @@
 .library-details-metric-value {
   font-size: 1.125rem;
   font-weight: 700;
-  color: #1e293b;
+  color: var(--text-primary, #1e293b);
 }
 
 .library-details-metric-value.library-details-grade {
@@ -168,7 +168,7 @@
 
 .library-details-close:hover {
   background: #f1f5f9;
-  color: #1e293b;
+  color: var(--text-primary, #1e293b);
 }
 
 /* Body */
@@ -202,7 +202,7 @@
 
 /* Card Styles */
 .library-details-card {
-  background: white;
+  background: var(--bg-primary, white);
   border-radius: 12px;
   padding: 1.5rem;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
@@ -229,7 +229,7 @@
 .library-details-card-title {
   font-size: 1.125rem;
   font-weight: 700;
-  color: #1e293b;
+  color: var(--text-primary, #1e293b);
   margin: 0;
   letter-spacing: -0.3px;
 }
@@ -263,7 +263,7 @@
 .library-details-key-value {
   font-size: 1rem;
   font-weight: 600;
-  color: #1e293b;
+  color: var(--text-primary, #1e293b);
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -348,8 +348,8 @@
 /* Code Block */
 .library-details-code-block {
   position: relative;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
+  background: var(--bg-secondary, #f8fafc);
+  border: 1px solid var(--border-color, #e2e8f0);
   border-radius: 8px;
   padding: 1rem;
   margin-top: 0.5rem;
@@ -358,7 +358,7 @@
 .library-details-code {
   font-family: 'Courier New', 'Monaco', 'Menlo', monospace;
   font-size: 0.9rem;
-  color: #1e293b;
+  color: var(--text-primary, #1e293b);
   display: block;
   white-space: pre-wrap;
   word-break: break-all;
@@ -368,7 +368,7 @@
   margin: 0;
   font-family: 'Courier New', 'Monaco', 'Menlo', monospace;
   font-size: 0.9rem;
-  color: #1e293b;
+  color: var(--text-primary, #1e293b);
   white-space: pre-wrap;
   word-break: break-all;
 }
@@ -382,7 +382,7 @@
   position: absolute;
   top: 0.75rem;
   right: 0.75rem;
-  background: white;
+  background: var(--bg-primary, white);
   border: 1px solid #e2e8f0;
   border-radius: 6px;
   padding: 0.5rem;
@@ -432,7 +432,7 @@
 .library-details-info-value {
   font-size: 0.95rem;
   font-weight: 600;
-  color: #1e293b;
+  color: var(--text-primary, #1e293b);
 }
 
 /* Status Colors */
@@ -465,7 +465,7 @@
 }
 
 .library-details-vulnerability-item {
-  background: white;
+  background: var(--bg-primary, white);
   border: 1px solid #fecaca;
   border-radius: 8px;
   padding: 1rem;
@@ -679,7 +679,7 @@
 
 /* Footer */
 .library-details-footer {
-  background: white;
+  background: var(--bg-primary, white);
   padding: 1.5rem 2rem;
   border-top: 1px solid #e2e8f0;
   display: flex;
