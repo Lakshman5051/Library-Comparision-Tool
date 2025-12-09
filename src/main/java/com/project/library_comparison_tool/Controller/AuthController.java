@@ -92,7 +92,15 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(
             @RequestBody LoginRequest loginRequest,
-            HttpSession session) {
+            HttpSession session,
+            jakarta.servlet.http.HttpServletRequest request) {
+
+        System.out.println("\n========== DEBUG: POST /api/auth/login ==========");
+        System.out.println("Request Origin: " + request.getHeader("Origin"));
+        System.out.println("Request Referer: " + request.getHeader("Referer"));
+        System.out.println("Email: " + loginRequest.getEmail());
+        System.out.println("Session ID before login: " + session.getId());
+        System.out.println("Session isNew before login: " + session.isNew());
 
         try {
             // Validate required fields
@@ -121,14 +129,26 @@ public class AuthController {
                 // Password verified - complete login directly (no OTP required)
                 AuthResponse loginResponse = authService.completeLogin(loginRequest.getEmail(), session);
                 loginResponse.setMessage("Login successful");
+
+                System.out.println("Login successful!");
+                System.out.println("Session ID after login: " + session.getId());
+                System.out.println("User ID in session: " + session.getAttribute("userId"));
+                System.out.println("Session attributes: " + java.util.Collections.list(session.getAttributeNames()));
+                System.out.println("========== END LOGIN DEBUG ==========\n");
+
                 return ResponseEntity.ok(loginResponse);
             } else {
+                System.out.println("Login failed: " + response.getMessage());
+                System.out.println("========== END LOGIN DEBUG ==========\n");
                 return ResponseEntity
                         .status(HttpStatus.UNAUTHORIZED)
                         .body(response);
             }
 
         } catch (Exception e) {
+            System.out.println("Login exception: " + e.getMessage());
+            e.printStackTrace();
+            System.out.println("========== END LOGIN DEBUG ==========\n");
             return ResponseEntity
                     .status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(AuthResponse.builder()
@@ -167,41 +187,62 @@ public class AuthController {
 
 
     @GetMapping("/check")
-    public ResponseEntity<Map<String, Object>> checkAuthentication(HttpSession session) {
-        // DEBUG: Log session details
-        System.out.println("=== DEBUG: GET /api/auth/check ===");
+    public ResponseEntity<Map<String, Object>> checkAuthentication(
+            HttpSession session,
+            jakarta.servlet.http.HttpServletRequest request) {
+
+        // Enhanced DEBUG logging
+        System.out.println("\n========== DEBUG: GET /api/auth/check ==========");
+        System.out.println("Request URL: " + request.getRequestURL());
+        System.out.println("Request Origin: " + request.getHeader("Origin"));
+        System.out.println("Request Referer: " + request.getHeader("Referer"));
+
+        // Log cookies received
+        jakarta.servlet.http.Cookie[] cookies = request.getCookies();
+        if (cookies != null) {
+            System.out.println("Cookies received:");
+            for (jakarta.servlet.http.Cookie cookie : cookies) {
+                System.out.println("  - " + cookie.getName() + " = " + cookie.getValue().substring(0, Math.min(20, cookie.getValue().length())) + "...");
+            }
+        } else {
+            System.out.println("NO COOKIES RECEIVED!");
+        }
+
         System.out.println("Session: " + (session != null ? "exists" : "null"));
-        
+
         Map<String, Object> response = new java.util.HashMap<>();
-        
+
         if (session != null) {
             System.out.println("Session ID: " + session.getId());
             System.out.println("Session is new: " + session.isNew());
+            System.out.println("Session creation time: " + new java.util.Date(session.getCreationTime()));
+
             Long userId = (Long) session.getAttribute("userId");
             System.out.println("User ID from session: " + userId);
-            
+
             java.util.List<String> attributes = java.util.Collections.list(session.getAttributeNames());
             System.out.println("All session attributes: " + attributes);
-            
-        boolean isAuthenticated = authService.isAuthenticated(session);
+
+            boolean isAuthenticated = authService.isAuthenticated(session);
             System.out.println("Is authenticated: " + isAuthenticated);
-            
+
             response.put("authenticated", isAuthenticated);
             response.put("sessionExists", true);
             response.put("sessionId", session.getId());
             response.put("hasUserId", userId != null);
-            
-            // If not authenticated but session exists, provide helpful message
+            response.put("sessionIsNew", session.isNew());
+
             if (!isAuthenticated && attributes.isEmpty()) {
                 response.put("message", "Session exists but no login data found. Please log in.");
             }
         } else {
-            System.out.println("No session found");
+            System.out.println("ERROR: No session found - this should never happen!");
             response.put("authenticated", false);
             response.put("sessionExists", false);
             response.put("message", "No session found. Please log in.");
         }
 
+        System.out.println("========== END DEBUG ==========\n");
         return ResponseEntity.ok(response);
     }
 

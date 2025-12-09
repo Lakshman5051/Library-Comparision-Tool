@@ -21,15 +21,20 @@ public class SessionAuthenticationFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
-        
+
         String requestPath = request.getRequestURI();
-        
+
         // Only process session for API requests (skip static resources)
         if (requestPath.startsWith("/api/")) {
             HttpSession session = request.getSession(false);
 
+            System.out.println("SessionAuthenticationFilter: " + request.getMethod() + " " + requestPath);
+            System.out.println("  Session exists: " + (session != null));
+
             if (session != null) {
+                System.out.println("  Session ID: " + session.getId());
                 Long userId = (Long) session.getAttribute("userId");
+                System.out.println("  User ID: " + userId);
 
                 if (userId != null) {
                     // User is authenticated via session
@@ -54,10 +59,15 @@ public class SessionAuthenticationFilter extends OncePerRequestFilter {
                     );
 
                     SecurityContextHolder.getContext().setAuthentication(authentication);
+                    System.out.println("  ✓ Authentication set for user: " + userEmail);
+                } else {
+                    System.out.println("  ✗ No userId in session - not authenticated");
                 }
+            } else {
+                System.out.println("  ✗ No session found");
             }
         }
-        
+
         filterChain.doFilter(request, response);
     }
 }

@@ -92,7 +92,7 @@ public class Project {
         return user != null ? user.getUsername() : null;
     }
 
-    
+
     public String getOwnerEmail() {
         return user != null ? user.getEmail() : null;
     }

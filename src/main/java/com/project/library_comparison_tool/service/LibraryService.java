@@ -3,6 +3,9 @@ package com.project.library_comparison_tool.service;
 import com.project.library_comparison_tool.dto.LibraryDTO;
 import com.project.library_comparison_tool.entity.Library;
 import com.project.library_comparison_tool.repository.LibraryRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import com.project.library_comparison_tool.dto.AdvancedSearchDTO;
 import com.project.library_comparison_tool.repository.LibrarySpecification;
@@ -67,6 +70,11 @@ public class LibraryService {
         return libraryRepository.findAll();
     }
 
+    // Get all libraries with pagination
+    public Page<Library> getAllLibrariesPaginated(Pageable pageable) {
+        return libraryRepository.findAll(pageable);
+    }
+
     // Get one by ID
     public Optional<Library> getLibraryById(Long id) {
         return libraryRepository.findById(id);
@@ -127,5 +135,64 @@ public class LibraryService {
 
         // Convert to DTOs
         return LibraryDTO.fromEntities(libraries, comparisonService);
+    }
+
+    public Page<LibraryDTO> advancedSearchPaginated(AdvancedSearchDTO criteria, Pageable pageable) {
+        // Build dynamic query specification
+        Specification<Library> spec = LibrarySpecification.withAdvancedSearch(criteria);
+
+        // Execute query - get ALL matching results first for filtering
+        List<Library> libraries = libraryRepository.findAll(spec);
+
+        // Filter by quality grades (done in-memory since it's a calculated field)
+        if (criteria.getIncludeGrades() != null && !criteria.getIncludeGrades().isEmpty()) {
+            libraries = libraries.stream()
+                    .filter(lib -> {
+                        ComparisonService.ComparisonResult result = comparisonService.calculateComparison(lib);
+                        return criteria.getIncludeGrades().contains(result.getQualityGrade());
+                    })
+                    .collect(Collectors.toList());
+        }
+
+        // Apply sorting
+        if (criteria.getSortBy() != null) {
+            switch (criteria.getSortBy()) {
+                case "stars":
+                    libraries.sort(Comparator.comparing(Library::getGithubStars,
+                            Comparator.nullsLast(Comparator.reverseOrder())));
+                    break;
+                case "dependents":
+                    libraries.sort(Comparator.comparing(Library::getDependentProjectsCount,
+                            Comparator.nullsLast(Comparator.reverseOrder())));
+                    break;
+                case "name":
+                    libraries.sort(Comparator.comparing(Library::getName));
+                    break;
+                case "updated":
+                    libraries.sort(Comparator.comparing(Library::getLastRepositoryReleaseDate,
+                            Comparator.nullsLast(Comparator.reverseOrder())));
+                    break;
+            }
+        }
+
+        // Get total count before pagination
+        int totalElements = libraries.size();
+
+        // Apply pagination manually
+        int start = (int) pageable.getOffset();
+        int end = Math.min((start + pageable.getPageSize()), totalElements);
+
+        List<Library> paginatedLibraries;
+        if (start > totalElements) {
+            paginatedLibraries = List.of();
+        } else {
+            paginatedLibraries = libraries.subList(start, end);
+        }
+
+        // Convert to DTOs
+        List<LibraryDTO> libraryDTOs = LibraryDTO.fromEntities(paginatedLibraries, comparisonService);
+
+        // Return as Page
+        return new PageImpl<>(libraryDTOs, pageable, totalElements);
     }
 }
