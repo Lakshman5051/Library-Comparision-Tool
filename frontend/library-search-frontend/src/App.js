@@ -484,6 +484,20 @@ const [excludeSecurityIssues, setExcludeSecurityIssues] = useState(false);
   useEffect(() => {
     const checkAuthStatus = async () => {
       try {
+        // Tab-level authentication tracking
+        // sessionStorage is cleared when the tab is closed (unlike localStorage)
+        // This ensures users must re-login when they close and reopen a tab
+        const tabAuthenticated = sessionStorage.getItem('tabAuthenticated');
+
+        // If this tab was never authenticated, show landing page
+        if (!tabAuthenticated) {
+          console.log('Tab not authenticated - showing landing page');
+          setIsLoggedIn(false);
+          setShowLandingPage(true);
+          return;
+        }
+
+        // Tab was previously authenticated - verify session is still valid
         const API_URL = process.env.REACT_APP_API_URL || '';
         const response = await fetch(`${API_URL}/api/auth/check`, {
           method: 'GET',
@@ -518,13 +532,15 @@ const [excludeSecurityIssues, setExcludeSecurityIssues] = useState(false);
             }
           }
         } else {
-          // Not authenticated - show landing page
+          // Session invalid - clear tab authentication and show landing page
+          sessionStorage.removeItem('tabAuthenticated');
           setIsLoggedIn(false);
           setShowLandingPage(true);
         }
       } catch (error) {
         console.error('Session restoration failed:', error);
-        // On error, assume not logged in
+        // On error, clear tab authentication and show landing page
+        sessionStorage.removeItem('tabAuthenticated');
         setIsLoggedIn(false);
         setShowLandingPage(true);
       }
@@ -589,6 +605,11 @@ const [excludeSecurityIssues, setExcludeSecurityIssues] = useState(false);
   const handleLogin = (userData) => {
     setCurrentUser(userData);
     setIsLoggedIn(true);
+
+    // CRITICAL: Mark this tab as authenticated
+    // This flag persists only for this tab and is cleared when tab closes
+    sessionStorage.setItem('tabAuthenticated', 'true');
+    console.log('Tab authenticated - session storage flag set');
 
     // Check if this is a new user (first signup)
     if (userData.isNewUser) {
@@ -700,6 +721,10 @@ const [excludeSecurityIssues, setExcludeSecurityIssues] = useState(false);
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
+      // Clear tab authentication flag
+      sessionStorage.removeItem('tabAuthenticated');
+      console.log('Tab authentication cleared on logout');
+
       // Clear frontend state
       setIsLoggedIn(false);
       setCurrentUser(null);

@@ -22,8 +22,12 @@ export const authenticatedFetch = async (url, options = {}) => {
     },
   };
 
+  // Major fix here:
+  // This ensures relative URLs like '/api/projects' get the correct base URL
+  const fullUrl = url.startsWith('http') ? url : `${API_URL}${url}`;
+
   try {
-    const response = await fetch(url, fetchOptions);
+    const response = await fetch(fullUrl, fetchOptions);
 
     // If we get 401 Unauthorized, session has expired
     if (response.status === 401) {

@@ -62,11 +62,17 @@ public class SessionConfig {
         serializer.setUseSecureCookie(finalSecure);
         serializer.setSameSite(normalizedSameSite);
 
+        // Browser-session only cookie (deleted when ALL browser windows close)
+        // -1 = session cookie (no expiration date set, deleted on browser close)
+        // This provides better security while maintaining UX during active browsing
+        serializer.setCookieMaxAge(-1);
+
         System.out.println("Cookie name: SESSION");
         System.out.println("Cookie path: /");
         System.out.println("HttpOnly: true");
         System.out.println("Secure: " + finalSecure + (finalSecure != secure ? " (auto-enabled for SameSite=None)" : ""));
         System.out.println("SameSite: " + normalizedSameSite);
+        System.out.println("Cookie MaxAge: -1 (browser-session only - deleted when browser closes)");
         System.out.println("========== SESSION COOKIE CONFIGURED ==========\n");
         return serializer;
     }
