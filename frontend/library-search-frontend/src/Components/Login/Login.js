@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import './Login.css';
 import GoogleLoginButton from '../GoogleLoginButton/GoogleLoginButton';
 import { loginWithGoogle, login } from '../../Services/authService';
+import { waitForSessionReady } from '../../Services/sessionUtils';
 import ForgotPassword from '../ForgotPassword/ForgotPassword';
 import ResetPassword from '../ResetPassword/ResetPassword';
 
@@ -41,6 +42,14 @@ function Login({ onLogin, onSignup, onBack }) {
       const response = await login(loginData);
 
       if (response.success) {
+        // CRITICAL FIX: Wait for session to be fully established
+        console.log('Login API success - waiting for session to be ready...');
+        const sessionReady = await waitForSessionReady();
+
+        if (!sessionReady) {
+          console.warn('Session not ready after retries - proceeding anyway');
+        }
+
         // Login successful - pass user data to parent
         onLogin({
           userId: response.userId,
@@ -71,6 +80,14 @@ function Login({ onLogin, onSignup, onBack }) {
       const response = await loginWithGoogle(idToken);
 
       if (response.success) {
+        // CRITICAL FIX: Wait for session to be fully established
+        console.log('Google login API success - waiting for session to be ready...');
+        const sessionReady = await waitForSessionReady();
+
+        if (!sessionReady) {
+          console.warn('Session not ready after retries - proceeding anyway');
+        }
+
         // Pass user data to parent component
         onLogin({
           userId: response.userId,

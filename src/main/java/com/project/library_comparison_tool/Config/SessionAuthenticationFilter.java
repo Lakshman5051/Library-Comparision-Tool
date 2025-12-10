@@ -26,45 +26,82 @@ public class SessionAuthenticationFilter extends OncePerRequestFilter {
 
         // Only process session for API requests (skip static resources)
         if (requestPath.startsWith("/api/")) {
-            HttpSession session = request.getSession(false);
+            try {
+                HttpSession session = request.getSession(false);
 
-            System.out.println("SessionAuthenticationFilter: " + request.getMethod() + " " + requestPath);
-            System.out.println("  Session exists: " + (session != null));
+                System.out.println("SessionAuthenticationFilter: " + request.getMethod() + " " + requestPath);
+                System.out.println("  Session exists: " + (session != null));
 
-            if (session != null) {
-                System.out.println("  Session ID: " + session.getId());
-                Long userId = (Long) session.getAttribute("userId");
-                System.out.println("  User ID: " + userId);
+                if (session != null) {
+                    System.out.println("  Session ID: " + session.getId());
 
-                if (userId != null) {
-                    // User is authenticated via session
-                    // Create authentication token for Spring Security
-                    String userEmail = (String) session.getAttribute("userEmail");
-                    String authProvider = (String) session.getAttribute("authProvider");
-
-                    // Get user role from session if available, otherwise default to USER
-                    String role = (String) session.getAttribute("userRole");
-                    if (role == null) {
-                        role = "USER"; // Default role
+                    try {
+                        System.out.println("  Session Creation Time: " + new java.util.Date(session.getCreationTime()));
+                        System.out.println("  Session Last Accessed: " + new java.util.Date(session.getLastAccessedTime()));
+                    } catch (IllegalStateException e) {
+                        System.err.println("  ⚠️  Session invalidated: " + e.getMessage());
+                        session = null; // Treat as no session
                     }
 
-                    List<SimpleGrantedAuthority> authorities = Collections.singletonList(
-                        new SimpleGrantedAuthority("ROLE_" + role)
-                    );
+                    if (session != null) {
+                        // List all session attributes with error handling
+                        try {
+                            java.util.Enumeration<String> attributeNames = session.getAttributeNames();
+                            java.util.List<String> allAttributes = java.util.Collections.list(attributeNames);
+                            System.out.println("  All session attributes: " + allAttributes);
 
-                    Authentication authentication = new UsernamePasswordAuthenticationToken(
-                        userEmail != null ? userEmail : userId.toString(),
-                        null,
-                        authorities
-                    );
+                            // Try to get each attribute
+                            for (String attrName : allAttributes) {
+                                try {
+                                    Object attrValue = session.getAttribute(attrName);
+                                    System.out.println("    - " + attrName + " = " + attrValue + " (type: " + (attrValue != null ? attrValue.getClass().getName() : "null") + ")");
+                                } catch (Exception e) {
+                                    System.err.println("    - " + attrName + " = ERROR: " + e.getMessage());
+                                }
+                            }
 
-                    SecurityContextHolder.getContext().setAuthentication(authentication);
-                    System.out.println("  ✓ Authentication set for user: " + userEmail);
+                            Long userId = (Long) session.getAttribute("userId");
+                            System.out.println("  User ID: " + userId);
+
+                            if (userId != null) {
+                                // User is authenticated via session
+                                // Create authentication token for Spring Security
+                                String userEmail = (String) session.getAttribute("userEmail");
+                                String authProvider = (String) session.getAttribute("authProvider");
+
+                                // Get user role from session if available, otherwise default to USER
+                                String role = (String) session.getAttribute("userRole");
+                                if (role == null) {
+                                    role = "USER"; // Default role
+                                }
+
+                                List<SimpleGrantedAuthority> authorities = Collections.singletonList(
+                                        new SimpleGrantedAuthority("ROLE_" + role)
+                                );
+
+                                Authentication authentication = new UsernamePasswordAuthenticationToken(
+                                        userEmail != null ? userEmail : userId.toString(),
+                                        null,
+                                        authorities
+                                );
+
+                                SecurityContextHolder.getContext().setAuthentication(authentication);
+                                System.out.println("  ✓ Authentication set for user: " + userEmail);
+                            } else {
+                                System.out.println("  ✗ No userId in session - not authenticated");
+                            }
+                        } catch (Exception e) {
+                            System.err.println("  ⚠️  Error reading session attributes: " + e.getMessage());
+                            e.printStackTrace();
+                        }
+                    }
                 } else {
-                    System.out.println("  ✗ No userId in session - not authenticated");
+                    System.out.println("  ✗ No session found");
                 }
-            } else {
-                System.out.println("  ✗ No session found");
+            } catch (Exception e) {
+                System.err.println("  ⚠️  CRITICAL: Session filter error: " + e.getMessage());
+                e.printStackTrace();
+                // Continue without authentication rather than failing the request
             }
         }
 

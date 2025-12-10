@@ -163,7 +163,7 @@ const FavoritesView = forwardRef(({ onViewDetails }, ref) => {
                   <div className="favorite-tile-actions">
                     <button
                       className="favorite-view-btn"
-                      onClick={() => onViewDetails(lib)}
+                      onClick={(e) => { e.stopPropagation(); onViewDetails(lib, e); }}
                     >
                       View Details
                     </button>

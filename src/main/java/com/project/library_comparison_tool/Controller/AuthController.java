@@ -58,7 +58,16 @@ public class AuthController {
             }
 
             // Authenticate with Google
+            System.out.println("\n========== GOOGLE LOGIN ENDPOINT ==========");
+            System.out.println("Session ID before login: " + session.getId());
             AuthResponse response = authService.loginWithGoogle(idToken, session);
+            
+            // Verify session after login
+            System.out.println("Session ID after login: " + session.getId());
+            Long userId = (Long) session.getAttribute("userId");
+            System.out.println("User ID in session after login: " + userId);
+            System.out.println("All session attributes after login: " + java.util.Collections.list(session.getAttributeNames()));
+            System.out.println("========== GOOGLE LOGIN COMPLETE ==========\n");
 
             return ResponseEntity.ok(response);
 

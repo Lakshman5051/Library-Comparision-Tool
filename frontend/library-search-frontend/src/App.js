@@ -35,7 +35,8 @@ function LibraryCard({
   onAddExistingProject,
   onAddNewProject,
   onToggleCompare,
-  isCompared
+  isCompared,
+  isLoggedIn  // Add authentication state
 }) {
   const titleRowRef = useRef(null);
   const versionInlineRef = useRef(null);
@@ -44,20 +45,33 @@ function LibraryCard({
   const [isFavorited, setIsFavorited] = useState(null);
   const [favoriteLoading, setFavoriteLoading] = useState(false);
 
-  // Check favorite status on mount
+  // Check favorite status on mount - ONLY if user is logged in
+  // Session readiness is now handled in Login component via waitForSessionReady()
   useEffect(() => {
-    if (library.id) {
-      checkIfFavorited(library.id)
-        .then((data) => {
+    // CRITICAL: Only check favorites if user is authenticated
+    // This prevents calling authenticated endpoints before login completes
+    if (library.id && isLoggedIn) {
+      const checkFavorite = async () => {
+        try {
+          const data = await checkIfFavorited(library.id);
           if (data.success) {
             setIsFavorited(data.isFavorited);
           }
-        })
-        .catch((err) => {
-          console.error('Error checking favorite status:', err);
-        });
+        } catch (err) {
+          // Silently fail if not authenticated - user might not be logged in yet
+          if (err.message && !err.message.includes('Unauthorized')) {
+            console.error('Error checking favorite status:', err);
+          }
+        }
+      };
+
+      // Call immediately - no delay needed since Login component waits for session
+      checkFavorite();
+    } else if (!isLoggedIn) {
+      // Reset favorite status if user logs out
+      setIsFavorited(null);
     }
-  }, [library.id]);
+  }, [library.id, isLoggedIn]); // Add isLoggedIn as dependency
 
   useEffect(() => {
     const checkWrapping = () => {
@@ -1430,6 +1444,12 @@ const handleAdvancedSearch = async () => {
         />
         {showTermsModal && <TermsOfService onClose={() => setShowTermsModal(false)} />}
         {showPrivacyModal && <PrivacyPolicy onClose={() => setShowPrivacyModal(false)} />}
+        {selectedLibraryForDetails && (
+          <LibraryDetails
+            library={selectedLibraryForDetails}
+            onClose={handleCloseDetails}
+          />
+        )}
       </div>
     );
   }
@@ -1594,6 +1614,12 @@ const handleAdvancedSearch = async () => {
         />
         {showTermsModal && <TermsOfService onClose={() => setShowTermsModal(false)} />}
         {showPrivacyModal && <PrivacyPolicy onClose={() => setShowPrivacyModal(false)} />}
+        {selectedLibraryForDetails && (
+          <LibraryDetails
+            library={selectedLibraryForDetails}
+            onClose={handleCloseDetails}
+          />
+        )}
       </div>
     );
   }
@@ -1912,6 +1938,7 @@ const handleAdvancedSearch = async () => {
             onAddNewProject={handleAddNewProjectFromCard}
                     onToggleCompare={handleToggleCompareLibrary}
                     isCompared={!!compareSelection.find((lib) => lib.id === library.id)}
+                    isLoggedIn={isLoggedIn}
                   />
                 ))}
               </div>

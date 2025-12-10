@@ -44,8 +44,10 @@ public class AuthService {
      * @return AuthResponse containing user information
      * @throws GeneralSecurityException if token verification fails
      * @throws IOException if network error occurs
+     * 
+     * NOTE: @Transactional removed to ensure session attributes are saved immediately.
+     * User creation is handled in a separate transactional method.
      */
-    @Transactional
     public AuthResponse loginWithGoogle(String idToken, HttpSession session)
             throws GeneralSecurityException, IOException {
 
@@ -60,12 +62,37 @@ public class AuthService {
         User user = userService.findOrCreateGoogleUser(googleUserInfo);
 
         // Step 4: Store user in session
+        System.out.println("\n========== SETTING SESSION ATTRIBUTES (GOOGLE) ==========");
+        System.out.println("Session ID: " + session.getId());
+        System.out.println("User ID to store: " + user.getId());
+        System.out.println("User Email to store: " + user.getEmail());
+
+        // CRITICAL FIX: Set max inactive interval to ensure session persists
+        session.setMaxInactiveInterval(86400); // 24 hours in seconds
+
         session.setAttribute("userId", user.getId());
         session.setAttribute("userEmail", user.getEmail());
         session.setAttribute("authProvider", user.getAuthProvider().toString());
         // Store user role for Spring Security
         String userRole = user.getRole().toString().replace("ROLE_", "");
         session.setAttribute("userRole", userRole);
+        session.setAttribute("authenticated", true);
+
+        // Verify attributes were set IN MEMORY
+        Long storedUserId = (Long) session.getAttribute("userId");
+        String storedEmail = (String) session.getAttribute("userEmail");
+        System.out.println("Verification - Stored User ID: " + storedUserId);
+        System.out.println("Verification - Stored Email: " + storedEmail);
+        System.out.println("All session attributes: " + java.util.Collections.list(session.getAttributeNames()));
+
+        if (storedUserId == null || !storedUserId.equals(user.getId())) {
+            System.err.println("ERROR: Session attribute verification failed!");
+            throw new RuntimeException("Failed to create session - userId not set correctly");
+        }
+
+        System.out.println("✓ Session attributes verified in memory");
+        System.out.println("Note: Session will be persisted to database at end of request");
+        System.out.println("========== SESSION ATTRIBUTES SET ==========\n");
 
         // Step 5: Build and return response
         return buildAuthResponse(user, isNewUser, "Login successful");
@@ -238,13 +265,35 @@ public class AuthService {
         user.updateLastLogin();
         userService.saveUser(user);
 
-        // Create session
+        // Create session - MUST be done BEFORE transaction commits
+        System.out.println("\n========== COMPLETE LOGIN - SETTING SESSION ==========");
+        System.out.println("Session ID: " + session.getId());
+        System.out.println("User ID to store: " + user.getId());
+
+        // CRITICAL FIX: Set max inactive interval to ensure session persists
+        session.setMaxInactiveInterval(86400); // 24 hours in seconds
+
         session.setAttribute("userId", user.getId());
         session.setAttribute("userEmail", user.getEmail());
         session.setAttribute("authProvider", user.getAuthProvider().toString());
         // Store user role for Spring Security
         String userRole = user.getRole().toString().replace("ROLE_", "");
         session.setAttribute("userRole", userRole);
+        session.setAttribute("authenticated", true);
+
+        // Verify attributes were set IN MEMORY
+        Long storedUserId = (Long) session.getAttribute("userId");
+        System.out.println("Verification - Stored User ID: " + storedUserId);
+        System.out.println("All session attributes: " + java.util.Collections.list(session.getAttributeNames()));
+
+        if (storedUserId == null || !storedUserId.equals(user.getId())) {
+            System.err.println("ERROR: Session attribute verification failed!");
+            throw new RuntimeException("Failed to create session - userId not set correctly");
+        }
+
+        System.out.println("✓ Session attributes verified in memory");
+        System.out.println("Note: Session will be persisted to database at end of request");
+        System.out.println("========== SESSION SET ==========\n");
 
         // Return response
         return buildAuthResponse(user, false, "Login successful");

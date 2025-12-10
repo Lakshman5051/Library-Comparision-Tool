@@ -26,10 +26,19 @@ public class SessionConfig {
         serializer.setCookieName("SESSION");
         serializer.setCookiePath("/");
 
+        // CRITICAL FIX: For local development, DON'T set domain
+        // This allows cookies to work between localhost:3000 and localhost:8080
+        // In production, set cookie-domain environment variable
         if (cookieDomain != null && !cookieDomain.isBlank()) {
             serializer.setDomainName(cookieDomain); // e.g. yourdomain.com in prod
             System.out.println("Cookie domain: " + cookieDomain);
-        } // else use default host
+        } else {
+            // For localhost development, explicitly don't set domain
+            // This makes cookie work for the specific host (localhost:8080)
+            // But allows credentials: 'include' to send it cross-port
+            serializer.setDomainName(null);
+            System.out.println("Cookie domain: <not set - using request host>");
+        }
 
         // Normalize SameSite value (case-insensitive)
         String normalizedSameSite = sameSite != null ? sameSite.trim() : "Lax";
@@ -55,7 +64,6 @@ public class SessionConfig {
 
         System.out.println("Cookie name: SESSION");
         System.out.println("Cookie path: /");
-        System.out.println("Cookie domain: " + (cookieDomain == null || cookieDomain.isBlank() ? "<request-host>" : cookieDomain));
         System.out.println("HttpOnly: true");
         System.out.println("Secure: " + finalSecure + (finalSecure != secure ? " (auto-enabled for SameSite=None)" : ""));
         System.out.println("SameSite: " + normalizedSameSite);
