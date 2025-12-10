@@ -631,13 +631,35 @@ public class AuthController {
             User user = userService.findByEmail(request.getEmail())
                     .orElseThrow(() -> new RuntimeException("User not found"));
 
-            // Create session for verified user
+            // Create session for verified user - WITH ALL FIXES FROM LOGIN
+            System.out.println("\n========== EMAIL VERIFICATION - SETTING SESSION ==========");
+            System.out.println("Session ID: " + session.getId());
+            System.out.println("User ID to store: " + user.getId());
+
+            // CRITICAL FIX: Set max inactive interval to ensure session persists
+            session.setMaxInactiveInterval(86400); // 24 hours in seconds
+
             session.setAttribute("userId", user.getId());
             session.setAttribute("userEmail", user.getEmail());
             session.setAttribute("authProvider", user.getAuthProvider().toString());
             // Store user role for Spring Security
             String userRole = user.getRole().toString().replace("ROLE_", "");
             session.setAttribute("userRole", userRole);
+            session.setAttribute("authenticated", true);
+
+            // Verify attributes were set IN MEMORY
+            Long storedUserId = (Long) session.getAttribute("userId");
+            System.out.println("Verification - Stored User ID: " + storedUserId);
+            System.out.println("All session attributes: " + java.util.Collections.list(session.getAttributeNames()));
+
+            if (storedUserId == null || !storedUserId.equals(user.getId())) {
+                System.err.println("ERROR: Session attribute verification failed!");
+                throw new RuntimeException("Failed to create session - userId not set correctly");
+            }
+
+            System.out.println("✓ Session attributes verified in memory");
+            System.out.println("Note: Session will be persisted to database at end of request");
+            System.out.println("========== SESSION SET ==========\n");
 
             // Build response using AuthService
             AuthResponse response = authService.getCurrentUser(session);
