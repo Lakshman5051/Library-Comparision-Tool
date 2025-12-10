@@ -60,8 +60,24 @@ public class SessionAuthenticationFilter extends OncePerRequestFilter {
                                 }
                             }
 
-                            Long userId = (Long) session.getAttribute("userId");
-                            System.out.println("  User ID: " + userId);
+                            // Try to get userId - handle potential serialization delay
+                            Object userIdObj = session.getAttribute("userId");
+                            Long userId = null;
+
+                            if (userIdObj instanceof Long) {
+                                userId = (Long) userIdObj;
+                            } else if (userIdObj instanceof Integer) {
+                                userId = ((Integer) userIdObj).longValue();
+                            } else if (userIdObj != null) {
+                                System.err.println("  ⚠️  Unexpected userId type: " + userIdObj.getClass().getName());
+                                try {
+                                    userId = Long.parseLong(userIdObj.toString());
+                                } catch (NumberFormatException e) {
+                                    System.err.println("  ⚠️  Could not parse userId: " + e.getMessage());
+                                }
+                            }
+
+                            System.out.println("  User ID: " + userId + " (raw type: " + (userIdObj != null ? userIdObj.getClass().getName() : "null") + ")");
 
                             if (userId != null) {
                                 // User is authenticated via session
