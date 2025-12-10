@@ -31,16 +31,34 @@ public class SessionConfig {
             System.out.println("Cookie domain: " + cookieDomain);
         } // else use default host
 
+        // Normalize SameSite value (case-insensitive)
+        String normalizedSameSite = sameSite != null ? sameSite.trim() : "Lax";
+        // Spring Session expects: "None", "Lax", "Strict" (case-sensitive)
+        if (normalizedSameSite.equalsIgnoreCase("none")) {
+            normalizedSameSite = "None";
+        } else if (normalizedSameSite.equalsIgnoreCase("lax")) {
+            normalizedSameSite = "Lax";
+        } else if (normalizedSameSite.equalsIgnoreCase("strict")) {
+            normalizedSameSite = "Strict";
+        }
+
+        // CRITICAL: SameSite=None requires Secure=true (browser requirement)
+        boolean finalSecure = secure;
+        if ("None".equals(normalizedSameSite) && !secure) {
+            System.out.println("⚠️  WARNING: SameSite=None requires Secure=true. Auto-enabling Secure flag.");
+            finalSecure = true;
+        }
+
         serializer.setUseHttpOnlyCookie(true);
-        serializer.setUseSecureCookie(secure);
-        serializer.setSameSite(sameSite);
+        serializer.setUseSecureCookie(finalSecure);
+        serializer.setSameSite(normalizedSameSite);
 
         System.out.println("Cookie name: SESSION");
         System.out.println("Cookie path: /");
         System.out.println("Cookie domain: " + (cookieDomain == null || cookieDomain.isBlank() ? "<request-host>" : cookieDomain));
         System.out.println("HttpOnly: true");
-        System.out.println("Secure: " + secure);
-        System.out.println("SameSite: " + sameSite);
+        System.out.println("Secure: " + finalSecure + (finalSecure != secure ? " (auto-enabled for SameSite=None)" : ""));
+        System.out.println("SameSite: " + normalizedSameSite);
         System.out.println("========== SESSION COOKIE CONFIGURED ==========\n");
         return serializer;
     }
