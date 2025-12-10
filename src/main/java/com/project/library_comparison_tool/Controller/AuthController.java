@@ -669,6 +669,10 @@ public class AuthController {
                 response.setIsNewUser(true);
             }
 
+            // CRITICAL: Log that we're returning with session
+            System.out.println("Returning response with session ID: " + session.getId());
+            System.out.println("Session should be saved to database and cookie sent to client");
+
             return ResponseEntity.ok(response);
 
         } catch (Exception e) {

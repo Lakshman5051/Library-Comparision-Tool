@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './EmailVerification.css';
 import { verifyOTP, resendOTP } from '../../Services/emailVerificationService';
+import { waitForSessionReady } from '../../Services/sessionUtils';
 
 function EmailVerification({ email, onVerified, onClose }) {
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
@@ -80,8 +81,16 @@ function EmailVerification({ email, onVerified, onClose }) {
 
     try {
       const response = await verifyOTP(email, otpCode);
-      
+
       if (response.success) {
+        // CRITICAL FIX: Wait for session to be fully established
+        console.log('Email verification API success - waiting for session to be ready...');
+        const sessionReady = await waitForSessionReady();
+
+        if (!sessionReady) {
+          console.warn('Session not ready after retries - proceeding anyway');
+        }
+
         // Email verified successfully - pass full response
         onVerified(response);
       } else {
